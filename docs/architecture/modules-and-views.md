@@ -37,6 +37,6 @@ View/FooView         MonoBehaviour for the presentation             : ViewBase<I
 
 ## Related responsibilities
 
-- [Bootstrap and lifecycle](bootstrap-and-lifecycle.md): who makes, starts and disposes the modules.
+- [Bootstrap and lifecycle](bootstrap-and-lifecycle.md): who makes, starts and disposes the modules. Also the [rules for a module or a service](bootstrap-and-lifecycle.md#module-or-service).
 - [Messaging](messaging.md): the module bus and the client bus.
 - [Asset management](asset-management.md): the service that makes the views.

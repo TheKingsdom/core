@@ -10,7 +10,6 @@ This responsibility starts the application. It builds the services and the modul
 |------|--------------|-------------|
 | `Client` | The composition root. It runs the boot sequence. | [Infra/Bootstrap](infra/bootstrap.md) |
 | `IModule`, `ModuleScope` | The lifecycle contract of a module. The scope starts and disposes a group of modules. | [Infra/Module](infra/module.md) |
-| `IService` | The marker for a service that lives as long as the application. | [Infra/Service](infra/service.md) |
 
 ## How it works
 
@@ -22,6 +21,26 @@ This responsibility starts the application. It builds the services and the modul
 6. When `Client` is destroyed, the `ModuleScope` disposes the modules in reverse order.
 
 There is no DI container and no service locator. A constructor receives each dependency. A module can only use a dependency that was made before the module.
+
+## Module or service
+
+A service and a module do different jobs. A service has no common base type. It is an interface, for example `IAssetService`.
+
+| | Service | Module |
+|---|---------|--------|
+| Job | Does work when a caller asks. Gives data. | Holds behavior and state. Reacts to events. |
+| Lifetime | The application. | From `Start` to `Dispose`. |
+| Made in | `Client.CreateServices` | `Client.CreateModules` |
+| Base type | None | `IModule`, `BaseModule` |
+| Events | Has no event bus. Does not send events. | `BaseModule` gives it its own `Broadcaster`. |
+| Dependencies | Can use another service. Does not use a module. | Can use services and the modules that were made before it. |
+| Disposed by | Nobody | `ModuleScope`, in reverse order |
+
+Use these rules to choose:
+
+- If the code only answers calls, make a service.
+- If the code keeps state that changes while the game runs, or sends events, make a module.
+- Do not make a module that only passes calls to a service. Give the service to the modules that need it.
 
 ## Rules
 

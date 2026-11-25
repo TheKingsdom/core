@@ -6,7 +6,7 @@ Responsibility: [Records](../records.md).
 
 ## Purpose
 
-`IRecordService` gives typed design-time data ("records") to the modules. It is an `IService`. Refer to [Infra/Service](../infra/service.md).
+`IRecordService` gives typed design-time data ("records") to the modules. It is a service. Refer to [Module or service](../bootstrap-and-lifecycle.md#module-or-service).
 
 ## Types
 

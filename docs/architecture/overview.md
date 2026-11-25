@@ -29,13 +29,13 @@ The folder pages are in `docs/architecture/infra`, `docs/architecture/services` 
 
 | Responsibility | Folder pages |
 |----------------|--------------|
-| [Bootstrap and lifecycle](bootstrap-and-lifecycle.md) | [Infra/Bootstrap](infra/bootstrap.md), [Infra/Module](infra/module.md), [Infra/Service](infra/service.md) |
+| [Bootstrap and lifecycle](bootstrap-and-lifecycle.md) | [Infra/Bootstrap](infra/bootstrap.md), [Infra/Module](infra/module.md) |
 | [Modules and views](modules-and-views.md) | [Infra/Module](infra/module.md), [Infra/View](infra/view.md) |
 | [Messaging](messaging.md) | [Infra/Messaging](infra/messaging.md) |
 | [Commands](commands.md) | [Infra/Commands](infra/commands.md), [Infra/Utils](infra/utils.md) |
 | [Diagnostics](diagnostics.md) | [Infra/Logging](infra/logging.md), [Infra/Utils](infra/utils.md) |
-| [Asset management](asset-management.md) | [Services/Asset](services/asset/README.md), [Services/Asset/Resource](services/asset/resource.md), [Services/Asset/Addressable](services/asset/addressable.md), [Infra/Service](infra/service.md) |
-| [Records](records.md) | [Services/Data](services/data.md), [Infra/Service](infra/service.md) |
+| [Asset management](asset-management.md) | [Services/Asset](services/asset/README.md), [Services/Asset/Resource](services/asset/resource.md), [Services/Asset/Addressable](services/asset/addressable.md) |
+| [Records](records.md) | [Services/Data](services/data.md) |
 | [Game starter](game-starter.md) | [Game](game/README.md) |
 
 The scene that starts the game is `Assets/Scenes/ClientScene.unity`. It is the only scene in the build settings.
@@ -45,7 +45,7 @@ The scene that starts the game is `Assets/Scenes/ClientScene.unity`. It is the o
 - **No DI container and no service locator.** Code builds all objects by hand in a composition root. The order of construction is the order of dependency. Constructors receive the dependencies. Nothing is found by type. Refer to [Bootstrap and lifecycle](bootstrap-and-lifecycle.md).
 - **A module holds the behavior. A view holds the presentation.** Refer to [Modules and views](modules-and-views.md).
 - **Events separate modules from views.** Refer to [Messaging](messaging.md).
-- **A service lives as long as the application.** `Client` makes each service one time. Refer to [Asset management](asset-management.md) and [Records](records.md).
+- **A service lives as long as the application.** `Client` makes each service one time. A service has no events and no `Start`. Refer to [Module or service](bootstrap-and-lifecycle.md#module-or-service).
 
 ## Boot sequence
 

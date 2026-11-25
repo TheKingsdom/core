@@ -1,10 +1,9 @@
-﻿using Core.Infra.Service;
-using Cysharp.Threading.Tasks;
+﻿using Cysharp.Threading.Tasks;
 using UnityEngine;
 
 namespace Core.Services.Asset
 {
-    public interface IAssetService : IService
+    public interface IAssetService
     {
         UniTask<GameObject> Instantiate(string id);
         GameObject Instantiate<T>(IInstance<T> instance) where T: Object;

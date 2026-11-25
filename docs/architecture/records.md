@@ -10,7 +10,6 @@ This responsibility gives typed design-time data to the modules. The data is aut
 |------|--------------|-------------|
 | `BaseRecord`, `RecordSO`, `RecordStorage` | The data types and the assets that hold the data. | [Services/Data](services/data.md) |
 | `IRecordService`, `RecordService` | Finds the record types, loads the storage and gives the records. | [Services/Data](services/data.md) |
-| `IService` | The marker for an app-lifetime service. | [Infra/Service](infra/service.md) |
 
 ## How it works
 
