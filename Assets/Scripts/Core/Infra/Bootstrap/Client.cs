@@ -11,16 +11,16 @@ namespace Core.Infra.Bootstrap
 {
     public class Client : MonoBehaviour
     {
-        private readonly ModuleScope _modules = new();
-
         public IBroadcaster Broadcaster { get; private set; }
 
+        protected ModuleScope Modules { get; private set; }
         protected IAssetService Assets { get; private set; }
         protected IRecordService Records { get; private set; }
 
         private void Awake()
         {
             Broadcaster = new Broadcaster();
+            Modules = new ModuleScope(Broadcaster);
 
             CreateServices();
             Boot().FireAndForget();
@@ -28,7 +28,7 @@ namespace Core.Infra.Bootstrap
 
         private void OnDestroy()
         {
-            _modules.Dispose();
+            Modules.Dispose();
         }
 
         private async UniTask Boot()
@@ -43,8 +43,8 @@ namespace Core.Infra.Bootstrap
 
             CreateModules();
 
-            _modules.Start();
-            StartGame();
+            Modules.Start();
+            await StartGame();
         }
 
         protected virtual void CreateServices()
@@ -64,11 +64,12 @@ namespace Core.Infra.Bootstrap
 
         protected T AddModule<T>(T module) where T : class, IModule
         {
-            return _modules.Add(module);
+            return Modules.Add(module);
         }
 
-        protected virtual void StartGame()
+        protected virtual UniTask StartGame()
         {
+            return UniTask.CompletedTask;
         }
     }
 }

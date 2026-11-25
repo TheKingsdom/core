@@ -1,35 +1,29 @@
 # Game
 
-Source folder: `Assets/Scripts/Game`. Files: `Game.asmdef`, `GameClient.cs`.
+Source folder: `Assets/Scripts/Game`. File: `Game.asmdef`. Sub-folder: `Bootstrap`, refer to [Game/Bootstrap](bootstrap.md).
 
 Responsibility: [Game starter](../game-starter.md).
 
 ## Purpose
 
-`Game` contains the game composition and demo consumers. It references Core, the coop assemblies, and their external Unity assemblies. Core assemblies do not reference `Game`.
+`Game` is the assembly for the code of the game. It references `Core` and `UniTask`. `Core` does not reference `Game`.
 
-## Types
+## Rules
 
-### GameClient
+- The folder `Assets/Scripts/Game` holds only `Game.asmdef` and other folders. Do not put a script directly in it.
+- Make one folder for each module, and one folder for each group of other game code. A folder name gives the namespace. For example, `Assets/Scripts/Game/Bootstrap` has the namespace `Game.Bootstrap`.
+- Make one folder page for each folder. Refer to [Folders](#folders).
 
-`Game.GameClient` is a subclass of `Core.Infra.Bootstrap.Client`. The `GameClient` object in `Bootstrap` has this component. Refer to [Infra/Bootstrap](../infra/bootstrap.md).
+## Folders
 
-| Method | Behavior now |
-|--------|--------------|
-| `CreateModules` | Calls the base method. Adds `CoopDemoModule`. |
-| `StartGame` | Inherits the empty base implementation. The demo module controls startup. |
+| Folder | Content | Page |
+|--------|---------|------|
+| `Bootstrap` | `GameClient` and its hooks. | [Game/Bootstrap](bootstrap.md) |
 
-A method that you add to these calls must call the base method first.
-
-## Module folders
-
-Make one folder in `Assets/Scripts/Game` for each module. Make one folder page for each folder.
+## Folder pages
 
 - The source folder `Assets/Scripts/Game/<Name>` has the page `docs/architecture/game/<name>.md`.
 - If the folder has sub-folders, the page is `docs/architecture/game/<name>/README.md`. Each sub-folder has its own page next to it.
 - Write the names in lowercase. Replace a space with a hyphen.
 
-Each new folder page links to its responsibility pages. Add the folder page to the tables in the [overview](../overview.md).
-
-- [Demo module](demo.md)
-- [Demo setup](editor.md)
+Each new folder page links to its responsibility pages. Add the folder page to the table above and to the tables in the [overview](../overview.md).

@@ -1,9 +1,8 @@
-﻿using Core.Infra.Service;
-using Cysharp.Threading.Tasks;
+﻿using Cysharp.Threading.Tasks;
 
 namespace Core.Services.Data
 {
-    public interface IRecordService : IService
+    public interface IRecordService
     {
         UniTask CreateAll();
         T GetRecord<T>() where T : BaseRecord;

@@ -8,7 +8,7 @@ This responsibility gives the structure of a feature. A module holds the behavio
 
 | Part | What it does | Folder page |
 |------|--------------|-------------|
-| `IModule`, `BaseModule`, `IInternalModule` | The module types. `BaseModule` gives each module its own event bus. | [Infra/Module](infra/module.md) |
+| `IModule`, `BaseModule`, `IInternalModule` | The module types. `BaseModule` gives each module its own event bus. This bus is only for the module and its views. | [Infra/Module](infra/module.md) |
 | `ViewBase<T>` | The base class for the views of a module. | [Infra/View](infra/view.md) |
 
 ## Shape of a feature
@@ -32,11 +32,12 @@ View/FooView         MonoBehaviour for the presentation             : ViewBase<I
 ## Rules
 
 - A view is typed against the `Internal` interface. It cannot call the other methods of the module.
+- A module that must react to a moment in the game, for example the start of the game, implements a hook interface. Refer to [Messaging](messaging.md#hooks).
 - A view uses `ManagedAwake`, `ManagedStart`, `ManagedUpdate` and `ManagedDispose`. It does not put logic in the Unity methods.
 - A view that subscribes to an event must unsubscribe in `ManagedDispose`.
 
 ## Related responsibilities
 
-- [Bootstrap and lifecycle](bootstrap-and-lifecycle.md): who makes, starts and disposes the modules.
+- [Bootstrap and lifecycle](bootstrap-and-lifecycle.md): who makes, starts and disposes the modules. Also the [rules for a module or a service](bootstrap-and-lifecycle.md#module-or-service).
 - [Messaging](messaging.md): the module bus and the client bus.
 - [Asset management](asset-management.md): the service that makes the views.

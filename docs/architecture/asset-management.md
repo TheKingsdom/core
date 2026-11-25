@@ -11,7 +11,6 @@ This responsibility loads assets by a string id and instantiates prefabs. It cou
 | `IAssetService`, `IInstance`, `IAssetHandle` | The interface, the instance type and the handle type. Also the behavior that both implementations share. | [Services/Asset](services/asset/README.md) |
 | `ResourcesAssetService` | Loads from the Unity `Resources` folders. The default. | [Services/Asset/Resource](services/asset/resource.md) |
 | `AddressablesAssetService` | Loads with the Addressables package. | [Services/Asset/Addressable](services/asset/addressable.md) |
-| `IService` | The marker for an app-lifetime service. | [Infra/Service](infra/service.md) |
 
 ## How it works
 

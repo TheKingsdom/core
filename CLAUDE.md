@@ -1,6 +1,6 @@
 # Core
 
-A Unity project (`6000.7.0b7`) with shared infrastructure and services (`Assets/Scripts/Core`) and a ready `Game` assembly (`Assets/Scripts/Game`). The scene `Assets/Demo/Scenes/Bootstrap.unity` starts the coop demo through `GameClient`. A user of Core adds game logic to the Game assembly. The code is C#. It uses UniTask and Addressables.
+A Unity project (`6000.2.6f2`) with shared infrastructure and services (`Assets/Scripts/Core`) and a ready `Game` assembly (`Assets/Scripts/Game`). The scene `Assets/Scenes/ClientScene.unity` starts the game through `GameClient`. A user of Core adds game logic to the Game assembly. The code is C#. It uses UniTask and Addressables.
 
 ## Documentation
 
@@ -38,8 +38,10 @@ The rules for the docs are in [docs/conventions.md](docs/conventions.md). Read t
 ### Game assembly
 
 - Put the game code in `Assets/Scripts/Game`. Do not put game code in Core.
+- Keep only `Game.asmdef` and folders directly in `Assets/Scripts/Game`. Put each script in a folder.
 - Make one folder for each module. Make one folder page for each folder in `docs/architecture/game`.
 - Add each module in `GameClient.CreateModules` and start the game in `GameClient.StartGame`. The [Game starter](docs/architecture/game-starter.md) page has the steps.
+- Put a hook (its event and its interface) in the same folder and namespace as the code that broadcasts the event. Use the `create-hook` skill to add one. The [Hooks](docs/architecture/game/bootstrap.md#hooks) section has the details.
 - Do not delete `Assets/Resources/RecordsStorage.asset`. The boot sequence loads it.
 
 ### Rules for the documentation
@@ -47,9 +49,4 @@ The rules for the docs are in [docs/conventions.md](docs/conventions.md). Read t
 - Write all documents in ASD-STE100 Simplified Technical English.
 - When you add, rename or remove a source folder or a responsibility page, change the tables that list them. The [maintenance rules](docs/conventions.md#maintenance) name the tables.
 - Do not describe plans in `docs/architecture`. Describe only what exists in the code.
-
-## Coop demo
-
-Read [Run the demo](docs/coop-demo.md) and [Coop sessions](docs/architecture/coop-sessions.md). Core modules must not reference Game types.
-Use [Reuse the modules](docs/reuse-coop.md) for extraction boundaries and composition contracts.
-Use [Testing](docs/testing.md) for test commands, online requirements, and the latest local results.
+- Reference each relevant skill in the page that describes its task. The [conventions](docs/conventions.md#content) have the rule. The skill `create-hook` is the skill for hooks.

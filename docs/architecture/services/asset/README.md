@@ -6,7 +6,7 @@ Responsibility: [Asset management](../../asset-management.md).
 
 ## Purpose
 
-`IAssetService` loads and instantiates assets by a string id. It counts the instances of each asset that are alive. It is an `IService`. Refer to [Infra/Service](../../infra/service.md).
+`IAssetService` loads and instantiates assets by a string id. It counts the instances of each asset that are alive. It is a service. Refer to [Module or service](../../bootstrap-and-lifecycle.md#module-or-service).
 
 There are two implementations. They have the same behavior. They differ in the source of the assets.
 
