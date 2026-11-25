@@ -6,7 +6,7 @@ Responsibilities: [Bootstrap and lifecycle](../bootstrap-and-lifecycle.md), [Mes
 
 ## Purpose
 
-`Core.Infra.Bootstrap.Client` is the composition root of the application. It is a `MonoBehaviour`. `Game.GameClient` is the subclass of this project. Refer to [Game](../game/README.md).
+`Core.Infra.Bootstrap.Client` is the composition root of the application. It is a `MonoBehaviour`. `Game.Bootstrap.GameClient` is the subclass of this project. Refer to [Game/Bootstrap](../game/bootstrap.md).
 
 `Client` builds the services and the modules by hand. It holds the `ModuleScope` for the app-lifetime modules. Refer to [module](module.md).
 

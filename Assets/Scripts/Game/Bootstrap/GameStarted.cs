@@ -1,6 +1,6 @@
 using Core.Infra.Messaging;
 
-namespace Game.Hooks
+namespace Game.Bootstrap
 {
     public sealed class GameStarted : AsyncEvent
     {

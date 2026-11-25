@@ -68,7 +68,7 @@ A hook lets a module react to a moment in the life of the game, for example the 
 - An event class that derives from `Event` or `AsyncEvent`.
 - An interface that a module implements to receive the hook.
 
-Core defines no hooks. A game project defines its own. Refer to [Game/Hooks](../game/hooks.md).
+Core defines no hooks. A game project defines its own. A hook lives in the same folder and namespace as the code that broadcasts its event. Refer to [Hooks](../game/bootstrap.md#hooks). Use the skill [`create-hook`](../../../.claude/skills/create-hook/SKILL.md) to add a hook.
 
 `Bind` connects an event to an interface. `call` receives the module and the event. `BindAsync` does the same for an `AsyncEvent`. `call` returns a `UniTask`.
 

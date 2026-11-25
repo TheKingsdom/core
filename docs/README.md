@@ -40,6 +40,14 @@ Read the [overview](architecture/overview.md) first. Then read the responsibilit
 | [Records](architecture/records.md) | Typed design-time data that modules read at runtime |
 | [Game starter](architecture/game-starter.md) | The `Game` assembly and the `ClientScene` that start the game, and how to add game logic |
 
+## Skills
+
+A skill is a task guide for Claude Code. The skills are in `.claude/skills`. A page that describes a task refers to the skill for that task.
+
+| Skill | Task | Pages |
+|-------|------|-------|
+| [`create-hook`](../.claude/skills/create-hook/SKILL.md) | Make a hook: an event and an interface that modules implement | [Game/Bootstrap](architecture/game/bootstrap.md#how-to-add-a-hook), [Infra/Module](architecture/infra/module.md#hooks), [Messaging](architecture/messaging.md#hooks), [Game starter](architecture/game-starter.md) |
+
 ## Conventions
 
 The rules for the language, the structure and the content of these docs are in [conventions](conventions.md). The rules for the C# code are in [code style](code-style.md). All documents use ASD-STE100 Simplified Technical English.

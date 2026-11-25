@@ -1,9 +1,8 @@
 using Core.Infra.Bootstrap;
 using Core.Infra.Logging;
 using Cysharp.Threading.Tasks;
-using Game.Hooks;
 
-namespace Game
+namespace Game.Bootstrap
 {
     public class GameClient : Client
     {

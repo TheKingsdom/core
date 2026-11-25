@@ -31,12 +31,12 @@ The folder pages are in `docs/architecture/infra`, `docs/architecture/services` 
 |----------------|--------------|
 | [Bootstrap and lifecycle](bootstrap-and-lifecycle.md) | [Infra/Bootstrap](infra/bootstrap.md), [Infra/Module](infra/module.md) |
 | [Modules and views](modules-and-views.md) | [Infra/Module](infra/module.md), [Infra/View](infra/view.md) |
-| [Messaging](messaging.md) | [Infra/Messaging](infra/messaging.md), [Infra/Module](infra/module.md), [Game/Hooks](game/hooks.md) |
+| [Messaging](messaging.md) | [Infra/Messaging](infra/messaging.md), [Infra/Module](infra/module.md), [Game/Bootstrap](game/bootstrap.md#hooks) |
 | [Commands](commands.md) | [Infra/Commands](infra/commands.md), [Infra/Utils](infra/utils.md) |
 | [Diagnostics](diagnostics.md) | [Infra/Logging](infra/logging.md), [Infra/Utils](infra/utils.md) |
 | [Asset management](asset-management.md) | [Services/Asset](services/asset/README.md), [Services/Asset/Resource](services/asset/resource.md), [Services/Asset/Addressable](services/asset/addressable.md) |
 | [Records](records.md) | [Services/Data](services/data.md) |
-| [Game starter](game-starter.md) | [Game](game/README.md), [Game/Hooks](game/hooks.md) |
+| [Game starter](game-starter.md) | [Game](game/README.md), [Game/Bootstrap](game/bootstrap.md) |
 
 The scene that starts the game is `Assets/Scenes/ClientScene.unity`. It is the only scene in the build settings.
 

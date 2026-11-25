@@ -1,6 +1,6 @@
 using Cysharp.Threading.Tasks;
 
-namespace Game.Hooks
+namespace Game.Bootstrap
 {
     public interface IGameStarted
     {
