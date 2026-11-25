@@ -1,6 +1,6 @@
 # Game
 
-Source folder: `Assets/Scripts/Game`. Files: `Game.asmdef`, `GameClient.cs`.
+Source folder: `Assets/Scripts/Game`. Files: `Game.asmdef`, `GameClient.cs`. Sub-folder: `Hooks`, refer to [Game/Hooks](hooks.md).
 
 Responsibility: [Game starter](../game-starter.md).
 
@@ -16,8 +16,8 @@ Responsibility: [Game starter](../game-starter.md).
 
 | Method | Behavior now |
 |--------|--------------|
-| `CreateModules` | Calls the base method. Has no modules. Add the modules of the game here. |
-| `StartGame` | Calls the base method. Writes "Game started" to the log. Start the game here. |
+| `CreateModules` | Calls the base method. Has no modules. Add the modules of the game here. Binds `GameStarted` to `IGameStarted` with `BindAsync`. |
+| `StartGame` | Calls the base method. Writes "Game started" to the log. Broadcasts `GameStarted` and waits for the handlers. Start the game here. |
 
 A method that you add to these calls must call the base method first.
 
