@@ -41,9 +41,11 @@ The docs have three levels. Refer to the [README](README.md).
 - Name a type (for example `ModuleScope`). Give the file path one time, near the top of the folder page.
 - Describe the Core code and the code in the Game assembly of this repository. Do not describe the code of other projects that use Core.
 - Document each module that you add to the Game assembly in the same way as the Core code.
+- Refer to each skill that is relevant to the topic of a page. A skill is a task guide in `.claude/skills`. Put the reference where the page tells the reader to do the task. For example, the page that describes how to add a hook refers to the skill `create-hook`.
 
 ## Maintenance
 
 - When a code change alters the structure that a page describes, change that page in the same commit.
 - When a code folder is added, renamed or removed, change the folder pages, the responsibility pages and the tables in the [overview](architecture/overview.md).
 - When you add or remove a responsibility page, change the table in the [README](README.md) and the table in the overview.
+- When you add, rename or remove a skill in `.claude/skills`, change the references to it. Search the docs for the name of the skill. Change the table in the [README](README.md#skills).
