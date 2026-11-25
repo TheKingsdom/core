@@ -5,7 +5,7 @@
         "Core.Networking.Core",
         "Fusion.Unity",
         "UniTask",
-        "R3.Unity",
+        "Core",
         "Core.Resources",
         "Core.Lifetime",
         "Photon.Realtime"

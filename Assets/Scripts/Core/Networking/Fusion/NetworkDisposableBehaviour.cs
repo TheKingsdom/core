@@ -4,15 +4,13 @@ using System;
 using System.Threading;
 using Cysharp.Threading.Tasks;
 using Fusion;
-using R3;
 
 namespace Core.Networking.Fusion
 {
     public abstract class NetworkDisposableBehaviour : NetworkBehaviour
     {
         private AsyncInitialization _initialization = new();
-        protected ref DisposableBag Disposables => ref _initialization.Resources;
-        private DisposableBag _networkDisposables;
+        protected ResourceScope Disposables => _initialization.Resources;
         private SharedAuthorityLease _sharedAuthorityLease;
         private CancellationTokenSource _lifetimeCancellation = new();
         protected CancellationToken InitializationToken => _initialization.Token;
@@ -23,6 +21,7 @@ namespace Core.Networking.Fusion
             base.Spawned();
             if (_lifetimeCancellation.IsCancellationRequested)
             {
+                _lifetimeCancellation.Dispose();
                 _lifetimeCancellation = new CancellationTokenSource();
             }
 
@@ -45,7 +44,7 @@ namespace Core.Networking.Fusion
                 await OnInit();
                 ThrowIfInitializationInvalid();
             }, linked.Token, OnDeinit);
-            return Disposable.Empty;
+            return new ActionLease(() => { });
         }
 
         protected void ThrowIfInitializationInvalid()
@@ -67,7 +66,7 @@ namespace Core.Networking.Fusion
             Func<bool> canClaim = null)
         {
             _sharedAuthorityLease ??= new SharedAuthorityLease(this, onAcquired, onLost, canClaim);
-            _sharedAuthorityLease.Start(ref _networkDisposables);
+            _sharedAuthorityLease.Start();
         }
 
         protected void NotifySharedAuthorityChanged() => _sharedAuthorityLease?.NotifyFusionAuthorityChanged();
@@ -95,7 +94,6 @@ namespace Core.Networking.Fusion
                 {
                     _sharedAuthorityLease?.Dispose();
                     _sharedAuthorityLease = null;
-                    _networkDisposables.Clear();
                 }
             }
         }
@@ -113,9 +111,8 @@ namespace Core.Networking.Fusion
 
     public abstract class NetworkDisposableBehaviour<T> : NetworkBehaviour
     {
-        protected DisposableBag NetworkDisposables;
         private AsyncInitialization _initialization = new();
-        protected ref DisposableBag Disposables => ref _initialization.Resources;
+        protected ResourceScope Disposables => _initialization.Resources;
         private SharedAuthorityLease _sharedAuthorityLease;
         private CancellationTokenSource _lifetimeCancellation = new();
         protected T ActiveModel { get; private set; }
@@ -129,6 +126,7 @@ namespace Core.Networking.Fusion
             base.Spawned();
             if (_lifetimeCancellation.IsCancellationRequested)
             {
+                _lifetimeCancellation.Dispose();
                 _lifetimeCancellation = new CancellationTokenSource();
             }
 
@@ -185,7 +183,6 @@ namespace Core.Networking.Fusion
                 {
                     _sharedAuthorityLease?.Dispose();
                     _sharedAuthorityLease = null;
-                    NetworkDisposables.Clear();
                 }
             }
         }
@@ -194,7 +191,7 @@ namespace Core.Networking.Fusion
             Func<bool> canClaim = null)
         {
             _sharedAuthorityLease ??= new SharedAuthorityLease(this, onAcquired, onLost, canClaim);
-            _sharedAuthorityLease.Start(ref NetworkDisposables);
+            _sharedAuthorityLease.Start();
         }
 
         protected void NotifySharedAuthorityChanged() => _sharedAuthorityLease?.NotifyFusionAuthorityChanged();

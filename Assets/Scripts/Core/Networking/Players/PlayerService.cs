@@ -1,11 +1,11 @@
 using System;
 using System.Linq;
 using System.Collections.Generic;
-using Core.Infra.Lifetime;
+using Core.Infra.Messaging;
+using Core.Resources;
 using Core.Networking.Core;
 using Core.Networking.Fusion;
 using Fusion;
-using R3;
 using AvatarIndex = Core.Networking.Core.AvatarRegistry<Fusion.NetworkId, Fusion.PlayerRef, Core.Networking.Players.PlayerAvatar>;
 
 namespace Core.Networking.Players
@@ -14,11 +14,10 @@ namespace Core.Networking.Players
     {
         private readonly Dictionary<NetworkId, AvatarIndex.Registration> _registrations = new();
         private readonly AvatarIndex _avatars = new(PlayerRef.None);
-        private readonly IDisposable _networkSubscription;
-        private readonly Subject<PlayerAvatar> _changed = new();
+        private readonly NetworkService _network;
         public NetworkRunner Runner { get; }
         public RunnerGeneration Generation { get; }
-        public Observable<PlayerAvatar> Changed => _changed;
+        public IBroadcaster Broadcaster { get; } = new Broadcaster();
         public AvatarIndex.Record[] Avatars => _avatars.Records.ToArray();
         public PlayerRef[] Participants { get; private set; } = Array.Empty<PlayerRef>();
         public bool IsDisposed { get; private set; }
@@ -28,20 +27,24 @@ namespace Core.Networking.Players
             Runner = runner;
             Generation = generation;
             _avatars.Changed += OnAvatarChanged;
-            _networkSubscription = network.Snapshot.SafeSubscribe(snapshot =>
+            _network = network;
+            _network.Broadcaster.Subscribe<NetworkSnapshot>(OnSnapshot);
+            OnSnapshot(_network.Snapshot);
+        }
+
+        private void OnSnapshot(NetworkSnapshot snapshot)
+        {
+            if (snapshot.Generation == Generation)
             {
-                if (snapshot.Generation == generation)
-                {
-                    Participants = snapshot.Peers.ToArray();
-                }
-            });
+                Participants = snapshot.Peers.ToArray();
+            }
         }
 
         public IDisposable Register(PlayerAvatar avatar)
         {
             var id = avatar.Object.Id;
             _registrations[id] = _avatars.Register(id, avatar.Player, avatar, avatar.Identity, avatar.IsDisconnected);
-            return Disposable.Create(() =>
+            return new ActionLease(() =>
             {
                 if (_registrations.Remove(id, out var registration))
                 {
@@ -81,15 +84,14 @@ namespace Core.Networking.Players
                 return;
             }
             IsDisposed = true;
-            _networkSubscription.Dispose();
+            _network.Broadcaster.Unsubscribe<NetworkSnapshot>(OnSnapshot);
             _avatars.Changed -= OnAvatarChanged;
             _avatars.Dispose();
-            _changed.Dispose();
         }
 
         private void OnAvatarChanged(AvatarChangeKind kind, AvatarIndex.Record record)
         {
-            _changed.OnNext(record.Avatar);
+            Broadcaster.Broadcast(new PlayerAvatarChanged(kind, record.Avatar));
         }
     }
 }

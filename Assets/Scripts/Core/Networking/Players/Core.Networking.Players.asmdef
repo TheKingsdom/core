@@ -7,7 +7,7 @@
         "Core.Resources",
         "Core.Lifetime",
         "Fusion.Unity",
-        "R3.Unity",
+        "Core",
         "UniTask"
     ]
 }

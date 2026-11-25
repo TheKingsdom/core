@@ -1,17 +1,16 @@
-using Core.Resources;
 using System;
 using System.Threading;
 using Core.Networking.Core;
-using Core.Infra.Lifetime;
+using Core.Infra.Messaging;
 using Cysharp.Threading.Tasks;
 using Fusion;
-using R3;
 using UnityEngine;
 using UnityEngine.SceneManagement;
+using Event = Core.Infra.Messaging.Event;
 
 namespace Core.Networking.Fusion
 {
-    public sealed class SceneLoadSnapshot
+    public sealed class SceneLoadSnapshot : Event
     {
         public OperationId OperationId { get; }
         public RunnerGeneration Generation { get; }
@@ -35,12 +34,11 @@ namespace Core.Networking.Fusion
         private readonly FusionSceneManager _manager;
         private readonly RunnerGeneration _generation;
         private readonly CancellationTokenSource _lifetime = new();
-        private readonly ReactiveProperty<SceneLoadSnapshot> _state = new(null);
-        private DisposableBag _subscriptions;
         private Attempt _attempt;
         private long _nextId;
         private bool _disposed;
-        public ReadOnlyReactiveProperty<SceneLoadSnapshot> State => _state;
+        public SceneLoadSnapshot State { get; private set; }
+        public IBroadcaster Broadcaster { get; } = new Broadcaster();
 
         private sealed class Attempt
         {
@@ -56,21 +54,25 @@ namespace Core.Networking.Fusion
             _runner = runner;
             _manager = manager;
             _generation = generation;
-            manager.OnLoadProgress.SafeSubscribe(progress =>
+            manager.Broadcaster.Subscribe<SceneProgress>(ObserveProgress);
+            manager.Broadcaster.Subscribe<SceneRegistration>(ObserveRegistration);
+            manager.Broadcaster.Subscribe<SceneLoadFailure>(ObserveFailure);
+        }
+
+        private void ObserveProgress(SceneProgress progress)
+        {
+            if (TryObserveSceneProgress(progress))
             {
-                if (TryObserveSceneProgress(progress))
-                {
-                    Publish(_attempt);
-                }
-            }).AddTo(ref _subscriptions);
-            manager.OnRegistered.SafeSubscribe(ObserveRegistration).AddTo(ref _subscriptions);
-            manager.OnLoadFailed.SafeSubscribe(failure =>
+                Publish(_attempt);
+            }
+        }
+
+        private void ObserveFailure(SceneLoadFailure failure)
+        {
+            if (IsCurrentSceneFailure(failure))
             {
-                if (IsCurrentSceneFailure(failure))
-                {
-                    _attempt.Registered.TrySetException(failure.Error);
-                }
-            }).AddTo(ref _subscriptions);
+                _attempt.Registered.TrySetException(failure.Error);
+            }
         }
 
         public bool TryGetRegistration(SceneRef sceneRef, out SceneRegistration registration)
@@ -209,7 +211,8 @@ namespace Core.Networking.Fusion
         {
             if (CanPublishAttempt(attempt))
             {
-                _state.Value = new SceneLoadSnapshot(attempt.Operation);
+                State = new SceneLoadSnapshot(attempt.Operation);
+                Broadcaster.Broadcast(State);
             }
         }
 
@@ -222,8 +225,9 @@ namespace Core.Networking.Fusion
 
             _disposed = true;
             _lifetime.Cancel();
-            _subscriptions.Clear();
-            _state.Dispose();
+            _manager.Broadcaster.Unsubscribe<SceneProgress>(ObserveProgress);
+            _manager.Broadcaster.Unsubscribe<SceneRegistration>(ObserveRegistration);
+            _manager.Broadcaster.Unsubscribe<SceneLoadFailure>(ObserveFailure);
             _lifetime.Dispose();
         }
 

@@ -28,7 +28,14 @@ namespace Core.Infra.Bootstrap
 
         private void OnDestroy()
         {
-            Modules.Dispose();
+            try
+            {
+                Modules.Dispose();
+            }
+            finally
+            {
+                DisposeServices();
+            }
         }
 
         private async UniTask Boot()
@@ -51,6 +58,10 @@ namespace Core.Infra.Bootstrap
         {
             Assets = new ResourcesAssetService();
             Records = new RecordService(Assets);
+        }
+
+        protected virtual void DisposeServices()
+        {
         }
 
         protected virtual UniTask InitializeServices()

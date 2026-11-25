@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Core.Infra.Messaging;
 using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.InputSystem.Controls;
@@ -22,7 +23,7 @@ namespace Core.Input
         private readonly Dictionary<InputAction, GameInputAction> _actionCommands = new();
         private int _contextChangedFrame = -1;
 
-        public event Action DeviceChanged;
+        public IBroadcaster Broadcaster { get; } = new Broadcaster();
 
         public InputActionAsset Actions => _actions;
         public bool IsGamepad { get; private set; }
@@ -209,7 +210,6 @@ namespace Core.Input
                 UnityEngine.Object.DestroyImmediate(_actions);
             }
 
-            DeviceChanged = null;
         }
 
         private static bool RequiresReleaseAfterContextChange(GameInputAction command)
@@ -251,7 +251,7 @@ namespace Core.Input
             {
                 IsGamepad = false;
                 _bindingLabels.Clear();
-                DeviceChanged?.Invoke();
+                Broadcaster.Broadcast(new InputDeviceChanged(IsGamepad));
             }
         }
 
@@ -298,7 +298,7 @@ namespace Core.Input
             {
                 IsGamepad = usesGamepad;
                 _bindingLabels.Clear();
-                DeviceChanged?.Invoke();
+                Broadcaster.Broadcast(new InputDeviceChanged(IsGamepad));
             }
         }
 
@@ -332,7 +332,7 @@ namespace Core.Input
             return true;
         }
 
-private void OnActionTriggered(InputAction.CallbackContext context)
+        private void OnActionTriggered(InputAction.CallbackContext context)
         {
             if (!_actionCommands.TryGetValue(context.action, out var command))
             {

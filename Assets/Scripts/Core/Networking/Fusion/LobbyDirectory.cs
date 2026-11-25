@@ -1,4 +1,3 @@
-using Core.Resources;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
@@ -7,26 +6,20 @@ using Core.Networking.Core;
 using Cysharp.Threading.Tasks;
 using Fusion;
 using Fusion.Photon.Realtime;
-using R3;
+using Core.Infra.Messaging;
 using UnityEngine;
 using System.Threading;
 
 namespace Core.Networking.Fusion
 {
-    public sealed class LobbyDirectory : IDisposable
+    public sealed class LobbyDirectory
     {
         public const string ConfirmedPlayersPropertyKey = "confirmedPlayers";
-        private readonly ReactiveProperty<ReadOnlyCollection<SessionData>> _sessions = CreateInitialSessions();
-
-        private static ReactiveProperty<ReadOnlyCollection<SessionData>> CreateInitialSessions()
-        {
-            var sessions = Array.Empty<SessionData>();
-            var readOnlySessions = Array.AsReadOnly(sessions);
-            return new ReactiveProperty<ReadOnlyCollection<SessionData>>(readOnlySessions);
-        }
-
         private RegionInfo[] _regions = Array.Empty<RegionInfo>();
-        public ReadOnlyReactiveProperty<ReadOnlyCollection<SessionData>> Sessions => _sessions;
+
+        public IBroadcaster Broadcaster { get; } = new Broadcaster();
+        public ReadOnlyCollection<SessionData> Sessions { get; private set; } =
+            Array.AsReadOnly(Array.Empty<SessionData>());
         public RunnerGeneration Generation { get; private set; }
         public string Region { get; private set; }
 
@@ -35,7 +28,8 @@ namespace Core.Networking.Fusion
             Generation = generation;
             Region = null;
             var array = Array.Empty<SessionData>();
-            _sessions.Value = Array.AsReadOnly(array);
+            Sessions = Array.AsReadOnly(array);
+            Broadcaster.Broadcast(new LobbySessionsChanged(Sessions));
         }
 
         internal void Update(RunnerGeneration generation, string region, IEnumerable<SessionInfo> sessions)
@@ -56,7 +50,8 @@ namespace Core.Networking.Fusion
                 var maxPlayers = session.MaxPlayers;
                 return new SessionData(name, playerCount, maxPlayers, region, session.IsOpen, session.IsVisible);
             }).ToArray();
-            _sessions.Value = Array.AsReadOnly(array);
+            Sessions = Array.AsReadOnly(array);
+            Broadcaster.Broadcast(new LobbySessionsChanged(Sessions));
         }
 
         internal async UniTask FetchRegionsAsync(CancellationToken token)
@@ -95,7 +90,5 @@ namespace Core.Networking.Fusion
 
         internal string BestRegion =>
             _regions.Length == 0 ? "" : _regions.OrderBy(region => region.RegionPing).First().RegionCode;
-
-        public void Dispose() => _sessions.Dispose();
     }
 }

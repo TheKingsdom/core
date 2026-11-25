@@ -2,7 +2,7 @@
     "name": "Core.UI.Tests",
     "references": [
         "Core.UI",
-        "Unity.ugui"
+        "UnityEngine.UI"
     ],
     "includePlatforms": [
         "Editor"

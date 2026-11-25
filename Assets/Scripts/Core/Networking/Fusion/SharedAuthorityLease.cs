@@ -1,8 +1,6 @@
-using Core.Resources;
-using Core.Infra.Lifetime;
+using Cysharp.Threading.Tasks;
 using System;
 using Fusion;
-using R3;
 using UnityEngine;
 
 
@@ -30,7 +28,7 @@ namespace Core.Networking.Fusion
             _canClaim = canClaim;
         }
 
-        public void Start(ref DisposableBag disposables)
+        public void Start()
         {
             if (_started)
                 return;
@@ -39,12 +37,19 @@ namespace Core.Networking.Fusion
             _hadAuthority = false;
             Evaluate();
 
-            Observable.EveryUpdate()
-                .SafeSubscribe(_ => Evaluate())
-                .AddTo(ref disposables);
+            ObserveAsync().Forget(Debug.LogException);
         }
 
         public void NotifyFusionAuthorityChanged() => Evaluate();
+
+        private async UniTask ObserveAsync()
+        {
+            while (_started && _behaviour)
+            {
+                await UniTask.NextFrame();
+                Evaluate();
+            }
+        }
 
         private void Evaluate()
         {

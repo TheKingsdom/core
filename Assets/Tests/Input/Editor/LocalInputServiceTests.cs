@@ -165,7 +165,7 @@ namespace Core.Tests.Input
         {
             var keyboardLabel = _input.GetBindingLabel(GameInputAction.Jump);
             var changes = 0;
-            _input.DeviceChanged += () => changes++;
+            _input.Broadcaster.Subscribe<InputDeviceChanged>(_ => changes++);
             Press(_gamepad.buttonSouth);
             var gamepadLabel = _input.GetBindingLabel(GameInputAction.Jump);
             Press(_gamepad.buttonWest);

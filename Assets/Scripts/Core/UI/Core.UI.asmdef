@@ -4,10 +4,11 @@
     "references": [
         "Core.Input",
         "UniTask",
-        "R3.Unity",
+        "Core",
+        "Core.Resources",
         "Unity.InputSystem",
         "Unity.TextMeshPro",
-        "Unity.ugui",
+        "UnityEngine.UI",
         "Core.Lifetime"
     ],
     "autoReferenced": true,

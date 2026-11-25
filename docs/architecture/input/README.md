@@ -13,7 +13,7 @@ Input has no network or UI dependency. It owns a copy of the action asset. Playe
 `InputActionsFactory.Create` supplies the default `Gameplay`, `Common`, and `UI` action maps.
 `LocalInputService` resolves each `GameInputAction` by map and action name. A custom asset must preserve those names.
 The generic actions cover movement, look, jump, sprint, crouch, pause, pointer, click, navigation, submit, and cancel.
-The demo consumes movement and pause. The other actions remain available to game code.
+The session module gathers movement input and handles pause. The other actions remain available to game code.
 
 ## Player and window changes
 

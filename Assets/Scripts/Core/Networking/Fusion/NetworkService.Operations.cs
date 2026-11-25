@@ -1,14 +1,10 @@
-using Core.Resources;
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Threading;
 using Core.Networking.Core;
-using Core.Infra.Lifetime;
 using Cysharp.Threading.Tasks;
 using Fusion;
 using Fusion.Photon.Realtime;
-using R3;
 
 namespace Core.Networking.Fusion
 {
@@ -17,42 +13,32 @@ namespace Core.Networking.Fusion
         private readonly RunnerEpoch<NetworkRunner> _epochs = new();
         private IRunnerScopeInstaller _scopeInstaller;
 
-        public void Configure(IRunnerScopeInstaller installer, LobbyDirectory directory, ReconnectStore reconnect,
-            LocalPlayerIdentity identity)
-        {
-            if (IsConfigurationBlocked())
-            {
-                throw new InvalidOperationException("Scope composition must precede network initialization");
-            }
-
-            _scopeInstaller = installer ?? throw new ArgumentNullException(nameof(installer));
-            Directory = directory ?? throw new ArgumentNullException(nameof(directory));
-            Reconnect = reconnect ?? throw new ArgumentNullException(nameof(reconnect));
-            _identity = identity ?? throw new ArgumentNullException(nameof(identity));
-        }
-
-        private readonly ReactiveProperty<NetworkSnapshot> _snapshot = CreateInitialSnapshot();
-
-        private static ReactiveProperty<NetworkSnapshot> CreateInitialSnapshot()
-        {
-            var snapshot = new NetworkSnapshot(default, ConnectionPhase.Disconnected);
-            return new ReactiveProperty<NetworkSnapshot>(snapshot);
-        }
-
         private FusionRunnerSession _session;
         private NetworkOperationGate _operations;
         private bool _disposed;
-        private CancellationToken _applicationExit;
+        private readonly CancellationToken _applicationExit;
 
         private NetworkOperationGate Operations => _operations ??= new NetworkOperationGate(() => _epochs.Generation);
-        public ReadOnlyReactiveProperty<NetworkSnapshot> Snapshot => _snapshot;
+        public NetworkSnapshot Snapshot { get; private set; } = new(default, ConnectionPhase.Disconnected);
         public RunnerGeneration Generation => _epochs.Generation;
 
-        protected override UniTask OnInit()
+        public NetworkService(LobbyDirectory directory, ReconnectStore reconnect, LocalPlayerIdentity identity)
         {
+            Directory = directory ?? throw new ArgumentNullException(nameof(directory));
+            Reconnect = reconnect ?? throw new ArgumentNullException(nameof(reconnect));
+            _identity = identity ?? throw new ArgumentNullException(nameof(identity));
             _applicationExit = UnityEngine.Application.exitCancellationToken;
             Reconnect.Restore();
-            return UniTask.CompletedTask;
+        }
+
+        public void Configure(IRunnerScopeInstaller installer)
+        {
+            if (IsConfigurationBlocked())
+            {
+                throw new InvalidOperationException("Scope composition requires an idle network service");
+            }
+
+            _scopeInstaller = installer ?? throw new ArgumentNullException(nameof(installer));
         }
 
         public async UniTask<OperationResult> ConnectToLobbyAsync(CancellationToken cancellationToken = default)
@@ -113,7 +99,7 @@ namespace Core.Networking.Fusion
 
         private async UniTask<OperationResult> ConnectLobbyCoreAsync(NetworkOperationContext context, bool refresh)
         {
-            var phase = _snapshot.CurrentValue.Phase;
+            var phase = Snapshot.Phase;
             if (IsLobbyConnectionCurrent(refresh, phase))
             {
                 return context.Complete(OperationStatus.Success);
@@ -162,7 +148,7 @@ namespace Core.Networking.Fusion
         private async UniTask<OperationResult> JoinCoreAsync(NetworkOperationContext context,
             CreateSessionRequest create, SessionLocator locator, bool random)
         {
-            var phase = _snapshot.CurrentValue.Phase;
+            var phase = Snapshot.Phase;
             if (IsRoomJoinRejected(phase))
             {
                 return Reject(context);
@@ -232,8 +218,7 @@ namespace Core.Networking.Fusion
                 context.Stage = NetworkErrorStage.Admission;
                 try
                 {
-                    await _scopeInstaller.PrepareRoomAsync(scope.Runner, scope.Generation, create,
-                        context.CancellationToken);
+                    await scope.PrepareRoomAsync(_scopeInstaller, create, context.CancellationToken);
                 }
                 catch (TimeoutException error)
                 {
@@ -261,11 +246,6 @@ namespace Core.Networking.Fusion
         {
             context.Generation = _epochs.Generation;
             Reconnect.ApplyLeave(context.LeaveMode);
-            if (_snapshot.CurrentValue.Phase == ConnectionPhase.Lobby)
-            {
-                return context.Complete(OperationStatus.Success);
-            }
-
             if (IsPreviousRunnerCleanupPending())
             {
                 return context.Fail(NetworkErrorCode.ShutdownFailed, "Previous runner cleanup is not confirmed");
@@ -337,7 +317,7 @@ namespace Core.Networking.Fusion
             if (ShouldPublishConnectionError(result))
             {
                 var value = new NetworkOperationException(result).Message;
-                _onConnectionError.OnNext(value);
+                Broadcaster.Broadcast(new NetworkConnectionFailed(value));
             }
 
             return result;
@@ -367,7 +347,7 @@ namespace Core.Networking.Fusion
             scope.Own(resource);
             scope.ActivateCallbacks();
             Directory.Reset(scope.Generation);
-            PublishPhase(_snapshot.CurrentValue.Phase);
+            PublishPhase(Snapshot.Phase);
             return scope;
         }
 
@@ -426,7 +406,7 @@ namespace Core.Networking.Fusion
                 return;
             }
 
-            var current = _snapshot.CurrentValue;
+            var current = Snapshot;
             if (IsRosterPublicationBlocked(current))
             {
                 return;
@@ -449,35 +429,11 @@ namespace Core.Networking.Fusion
                 return;
             }
 
-            var previous = _snapshot.CurrentValue;
+            var previous = Snapshot;
             var operationId = Operations.ActiveOperationId;
-            _snapshot.Value = snapshot;
-            if (!ReferenceEquals(_snapshot.CurrentValue, snapshot))
-            {
-                return;
-            }
-
-            _roomPlayers.Value = snapshot.Peers.ToArray();
-            if (!ReferenceEquals(_snapshot.CurrentValue, snapshot))
-            {
-                return;
-            }
-
-            _isSessionOwner.Value = snapshot.IsOwner;
-            if (!ReferenceEquals(_snapshot.CurrentValue, snapshot))
-            {
-                return;
-            }
-
-            _connectionState.Value = snapshot.Phase switch
-            {
-                ConnectionPhase.ConnectingLobby or ConnectionPhase.Disconnecting => global::Core.Networking.Fusion.ConnectionState.Connecting,
-                ConnectionPhase.Lobby => global::Core.Networking.Fusion.ConnectionState.Lobby,
-                ConnectionPhase.JoiningRoom => global::Core.Networking.Fusion.ConnectionState.Joining,
-                ConnectionPhase.InRoom => global::Core.Networking.Fusion.ConnectionState.InRoom,
-                _ => global::Core.Networking.Fusion.ConnectionState.Disconnected
-            };
-            if (!ReferenceEquals(_snapshot.CurrentValue, snapshot))
+            Snapshot = snapshot;
+            Broadcaster.Broadcast(snapshot);
+            if (!ReferenceEquals(Snapshot, snapshot))
             {
                 return;
             }
@@ -511,12 +467,12 @@ namespace Core.Networking.Fusion
 
             void Emit(NetworkEventKind kind, PlayerRef player = default)
             {
-                if (!ReferenceEquals(_snapshot.CurrentValue, snapshot))
+                if (!ReferenceEquals(Snapshot, snapshot))
                 {
                     return;
                 }
                 var networkEvent = new NetworkEvent(kind, snapshot, operationId, player);
-                _events.OnNext(networkEvent);
+                Broadcaster.Broadcast(networkEvent);
             }
         }
 

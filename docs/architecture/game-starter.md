@@ -21,7 +21,7 @@ Files: `Assets/Scenes/ClientScene.unity`, `Assets/Resources/RecordsStorage.asset
 2. Unity starts the `GameClient` component.
 3. `Client` runs the boot sequence. Refer to [Bootstrap and lifecycle](bootstrap-and-lifecycle.md).
 4. `Client` loads `RecordsStorage` during `InitializeServices`.
-5. `GameClient.CreateModules` runs. It has no modules at the start. It binds `GameStarted` to `IGameStarted`.
+5. `GameClient.CreateModules` runs. It binds `GameStarted` to `IGameStarted` and registers the session module if the bootstrap has a session scene.
 6. `ModuleScope.Start()` starts the modules and attaches their hooks.
 7. `GameClient.StartGame` runs. It writes the message "Game started" to the log. Then it broadcasts `GameStarted` and waits. `OnGameStarted` of each module that implements `IGameStarted` runs one after the other.
 

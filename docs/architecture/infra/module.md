@@ -38,9 +38,9 @@ public interface IModule : IDisposable
 
 ### BaseModule
 
-`BaseModule` implements `IInternalModule`. It gives each module its own `ViewBroadcaster`. This bus is a private channel between the module and its views. Use it only for this communication. It is not the client bus.
+`BaseModule` implements `IInternalModule`. It gives each module its own `Broadcaster`. This bus is a private channel between the module and its views. Use it only for this communication. It is not the client bus.
 
-- `ViewBroadcaster` is a protected property. Only the module and its subclasses can use it. A module sends events to its views on this bus.
+- `BaseModule.Broadcaster` gives the module and its views the same bus.
 - Code that holds the module as its public interface cannot get this bus. The views get it through the explicit member `IInternalModule.Broadcaster`.
 - A module does not use this bus to talk to another module. A module uses the client bus for this.
 - A [hook](#hooks) is an event on the client bus. It never uses the bus of a module.

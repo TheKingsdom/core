@@ -1,17 +1,16 @@
 using System;
 using Cysharp.Threading.Tasks;
-using R3;
+using Core.Resources;
 using UnityEngine;
 
 namespace Core.Infra.Lifetime
 {
     public class DisposableBehaviour : MonoBehaviour
     {
-        protected DisposableBag Disposables;
+        protected ResourceScope Disposables { get; } = new();
 
         protected virtual void Awake()
         {
-            Disposables = new DisposableBag();
             OnInit().Forget();
         }
 
@@ -19,14 +18,14 @@ namespace Core.Infra.Lifetime
 
         protected virtual void OnDestroy()
         {
-            Disposables.Clear();
+            Disposables.Dispose();
         }
     }
 
     public class DisposableBehaviour<T> : MonoBehaviour
     {
         private AsyncInitialization _initialization = new();
-        protected ref DisposableBag Disposables => ref _initialization.Resources;
+        protected ResourceScope Disposables => _initialization.Resources;
         protected T ActiveModel { get; private set; }
         protected System.Threading.CancellationToken InitializationToken => _initialization.Token;
         public bool IsInitialized => _initialization.IsReady;

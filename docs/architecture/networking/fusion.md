@@ -12,8 +12,7 @@ Responsibility: [Coop sessions](../coop-sessions.md).
 
 ## Composition contract
 
-Call `Configure` with the installer, directory, reconnect store, and identity before `Init`.
-The application owns the directory and installer lifetimes.
+Construct the service with the directory, reconnect store, and identity. Configure the installer in the session module before the first network command.
 The runner owns the lease returned by `IRunnerScopeInstaller.Install`.
 `PrepareRoomAsync` must complete before the service publishes `InRoom`.
 `PrepareLeaveAsync` releases local player resources before runner shutdown.
@@ -36,8 +35,7 @@ Do not call Fusion runner shutdown directly from game menus. Use the service so 
 ## State and cleanup
 
 `Snapshot` contains the current phase, generation, session locator, local peer, owner flag, and peer roster.
-`Events` publishes phase, participant, and owner changes.
-`OnUnexpectedDisconnect` lets the application show its connection window.
+`Broadcaster` publishes each `NetworkSnapshot`, each `NetworkEvent` for phase, participant, and owner changes, `NetworkDisconnected`, and `NetworkConnectionFailed`. `ConnectionState`, `RoomPlayers`, and `IsSessionOwner` give the latest values.
 `Directory.Sessions` contains the current lobby room list.
 
 The service retires a generation before it shuts down the runner. Callbacks from a retired runner have no effect.
@@ -52,6 +50,6 @@ Editor processes add their process identity. An Editor restart can therefore cha
 Use an explicit identity when you need restore across separate process launches.
 The token-derived number selects a body. It does not prove account ownership.
 
-The demo loads a build-index scene. `FusionSceneManager` accepts explicit addressable paths when the application needs them.
+The session module loads a build-index scene. `FusionSceneManager` accepts explicit addressable paths when the application needs them.
 The default empty path list avoids addressable catalog discovery for build-index scenes.
 Refer to [Reuse the modules](../../reuse-coop.md) for the scene and config procedure.

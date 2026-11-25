@@ -57,3 +57,9 @@ Use the skill [`create-hook`](../../../.claude/skills/create-hook/SKILL.md). It 
 
 - A hook without a `Bind` call reaches no module. The code does not report it.
 - A module that is added after the event does not receive that event. The scope does not replay events.
+
+## Session startup
+
+When the session scene is configured, `GameClient` creates the game-wide services and adds `SessionModule`. The module handles `IGameStarted` for an optional startup join or reconnect. It awaits that operation, so later hooks start after it finishes. The module opens the loading window before the command and creates the game view after scene registration and local player readiness.
+
+`Client.OnDestroy` releases the module scope before it calls `DisposeServices`.

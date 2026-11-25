@@ -11,7 +11,7 @@ This responsibility sends events between parts of the code that do not know each
 | `IBroadcaster`, `Broadcaster` | The event bus. It keys the subscribers by event type. | [Infra/Messaging](infra/messaging.md) |
 | `Event`, `AsyncEvent` | The base classes of the events. | [Infra/Messaging](infra/messaging.md) |
 | `Client.Broadcaster` | The client bus. | [Infra/Bootstrap](infra/bootstrap.md) |
-| `BaseModule.ViewBroadcaster` | The bus of one module. Only for the module and its views. | [Infra/Module](infra/module.md) |
+| `BaseModule.Broadcaster` | The bus of one module. Only for the module and its views. | [Infra/Module](infra/module.md) |
 | `ModuleScope.Bind`, `ModuleScope.BindAsync` | Connect an event to an interface. Each module that implements the interface receives the event as a hook. | [Infra/Module](infra/module.md#hooks) |
 | Hooks of the game | The events and interfaces of the game, for example `GameStarted` and `IGameStarted`. | [Game/Bootstrap](game/bootstrap.md#hooks) |
 
@@ -45,7 +45,7 @@ A module that is added after the start receives only the later events. The bus a
 ## Rules
 
 - A module subscribes in `Start` and unsubscribes in `Dispose`. A module that uses a hook does not subscribe. `ModuleScope` does it.
-- Use the module bus (`BaseModule.ViewBroadcaster`) only for events between a module and its views. Use the client bus for events between modules.
+- Use the module bus (`BaseModule.Broadcaster`) only for events between a module and its views. Use the client bus for events between modules.
 - Make the `Bind` call for each hook interface. A hook without a `Bind` call reaches no module, and the code does not report it.
 - A view subscribes in `ManagedAwake` and unsubscribes in `ManagedDispose`.
 - Core defines no events or hooks. A game project defines its own.

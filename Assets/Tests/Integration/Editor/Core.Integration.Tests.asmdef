@@ -5,17 +5,15 @@
         "Core.Networking.Core",
         "Core.Networking.Players",
         "Core.Resources",
-        "Core.Lifetime",
         "Core.Input",
         "Core.UI",
         "UniTask",
-        "R3.Unity",
         "Fusion.Unity",
         "Photon.Realtime",
-        "Unity.ugui",
-        "Unity.TextMeshPro",
+        "UnityEngine.UI",
         "Unity.InputSystem",
-        "Game"
+        "Game",
+        "Core"
     ],
     "includePlatforms": [
         "Editor"
@@ -29,9 +27,6 @@
         "Fusion.Runtime.dll",
         "Fusion.Realtime.dll",
         "Fusion.Common.dll",
-        "Fusion.Sockets.dll",
-        "R3.dll",
-        "Microsoft.Bcl.TimeProvider.dll",
-        "Microsoft.Bcl.AsyncInterfaces.dll"
+        "Fusion.Sockets.dll"
     ]
 }

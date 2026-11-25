@@ -1,4 +1,4 @@
-using Core.Resources;
+using Core.Infra.Messaging;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
@@ -6,7 +6,7 @@ using Core.Networking.Core;
 using Fusion;
 
 namespace Core.Networking.Fusion {
-    public sealed class NetworkSnapshot {
+    public sealed class NetworkSnapshot : Event {
         public RunnerGeneration Generation { get; }
         public ConnectionPhase Phase { get; }
         public SessionLocator Session { get; }

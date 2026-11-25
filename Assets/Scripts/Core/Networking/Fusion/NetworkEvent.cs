@@ -1,4 +1,4 @@
-using Core.Resources;
+using Core.Infra.Messaging;
 using Core.Networking.Core;
 using Fusion;
 
@@ -6,7 +6,7 @@ namespace Core.Networking.Fusion
 {
     public enum NetworkEventKind { PhaseChanged, OwnerChanged, ParticipantJoined, ParticipantLeft }
 
-    public readonly struct NetworkEvent
+    public sealed class NetworkEvent : Event
     {
         public NetworkEventKind Kind { get; }
         public RunnerGeneration Generation => Snapshot.Generation;

@@ -2,6 +2,7 @@
     "name": "Core.Input.Tests",
     "references": [
         "Core.Input",
+        "Core",
         "Unity.InputSystem",
         "Unity.InputSystem.TestFramework"
     ],

@@ -1,10 +1,9 @@
 # Documentation
 
-This folder holds the project documentation for **Core**. Core is a Unity project (`6000.7.0b7`). It contains shared services and separate coop modules. The `Game` assembly composes these modules in a runnable demo. Add game modules, views, and records to this assembly.
+This folder holds the project documentation for **Core**. Core is a Unity project (`6000.7.0b7`). It contains shared services and separate coop modules. The `Game` assembly composes the services and modules. Add game modules, views, and records to this assembly.
 
 ## Practical guides
 
-- [Run and build the coop demo](coop-demo.md).
 - [Reuse the modules in another project](reuse-coop.md).
 - [Run tests and inspect results](testing.md).
 
@@ -44,7 +43,7 @@ Read the [overview](architecture/overview.md) first. Then read the responsibilit
 | [Diagnostics](architecture/diagnostics.md) | The log and the handling of tasks that nobody waits for |
 | [Asset management](architecture/asset-management.md) | Loading, instantiating and releasing assets (Resources and Addressables) |
 | [Records](architecture/records.md) | Typed design-time data that modules read at runtime |
-| [Game starter](architecture/game-starter.md) | The `Game` assembly, demo scenes, and steps to add game logic |
+| [Game starter](architecture/game-starter.md) | The `Game` assembly, the client scene, and steps to add game logic |
 | [Coop sessions](architecture/coop-sessions.md) | Diagrams of Core composition, room entry, player lifetime, input, windows, and resource cleanup |
 
 ## Skills

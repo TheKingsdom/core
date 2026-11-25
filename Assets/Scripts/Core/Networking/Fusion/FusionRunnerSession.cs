@@ -1,10 +1,10 @@
 using Core.Resources;
 using System;
+using System.Threading;
 using System.Threading.Tasks;
 using Core.Networking.Core;
 using Cysharp.Threading.Tasks;
 using Fusion;
-using R3;
 using UnityEngine;
 
 namespace Core.Networking.Fusion
@@ -12,9 +12,9 @@ namespace Core.Networking.Fusion
     internal sealed class FusionRunnerSession
     {
         private readonly GameObject _gameObject;
-        private readonly INetworkRunnerCallbacks _callbacks;
+        private readonly NetworkService _service;
         private bool _callbacksRegistered;
-        private DisposableBag _resources = new();
+        private readonly ResourceScope _resources = new();
         private readonly ShutdownBarrier _shutdown;
 
         public NetworkRunner Runner { get; }
@@ -29,7 +29,7 @@ namespace Core.Networking.Fusion
         public FusionRunnerSession(NetworkService service, RunnerGeneration generation)
         {
             Generation = generation;
-            _callbacks = service;
+            _service = service;
             _gameObject = new GameObject($"NetworkRunner G{generation}");
             UnityEngine.Object.DontDestroyOnLoad(_gameObject);
             Runner = _gameObject.AddComponent<NetworkRunner>();
@@ -62,7 +62,7 @@ namespace Core.Networking.Fusion
                 });
         }
 
-        public void Own(IDisposable resource) => _resources.Add(resource);
+        public void Own(IDisposable resource) => _resources.Own(resource);
 
         public void ActivateCallbacks()
         {
@@ -71,8 +71,24 @@ namespace Core.Networking.Fusion
                 throw new InvalidOperationException("Callbacks already registered");
             }
 
-            Runner.AddCallbacks(_callbacks);
+            Runner.AddCallbacks(_service);
             _callbacksRegistered = true;
+            TrackOwnershipAsync().Forget(Debug.LogException);
+        }
+
+        public UniTask PrepareRoomAsync(IRunnerScopeInstaller installer, CreateSessionRequest creation,
+            CancellationToken token)
+        {
+            return installer.PrepareRoomAsync(Runner, Generation, creation, token);
+        }
+
+        private async UniTask TrackOwnershipAsync()
+        {
+            while (Runner && !IsStopping)
+            {
+                await UniTask.NextFrame();
+                _service.UpdateSession();
+            }
         }
 
         public Task ShutdownAsync()
@@ -90,15 +106,21 @@ namespace Core.Networking.Fusion
 
             if (ShouldRemoveRunnerCallbacks())
             {
-                Runner.RemoveCallbacks(_callbacks);
+                Runner.RemoveCallbacks(_service);
             }
 
             Scenes.Dispose();
             Input.Dispose();
-            _resources.Clear();
-            if (_gameObject)
+            try
             {
-                UnityEngine.Object.Destroy(_gameObject);
+                _resources.Dispose();
+            }
+            finally
+            {
+                if (_gameObject)
+                {
+                    UnityEngine.Object.Destroy(_gameObject);
+                }
             }
         }
 

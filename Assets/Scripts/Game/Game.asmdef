@@ -5,7 +5,6 @@
         "Core",
         "UniTask",
         "Core.Resources",
-        "Core.Lifetime",
         "Core.Input",
         "Core.UI",
         "Core.Networking.Core",
@@ -13,10 +12,7 @@
         "Core.Networking.Players",
         "Fusion.Unity",
         "Unity.InputSystem",
-        "Unity.TextMeshPro",
-        "Unity.ugui",
-        "R3.Unity",
-        "Photon.Realtime"
+        "UnityEngine.UI"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],

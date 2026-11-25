@@ -1,242 +1,292 @@
-using Core.Infra.Lifetime;
-using Core.Input;
-using Core.Input.TextInput;
-using Core.UI;
 using System;
 using System.Collections.Generic;
-using Cysharp.Threading.Tasks;
-using R3;
+using Core.Infra.Messaging;
+using Core.Infra.Module;
+using Core.Input;
+using Core.Input.TextInput;
+using Core.Resources;
+using Core.Services.Asset;
 using UnityEngine;
+using Object = UnityEngine.Object;
 
 namespace Core.UI.Windows
 {
-    public class WindowsService : DisposableBehaviour<WindowsService.Model>
+    public sealed class WindowsService : IDisposable
     {
-        public LocalInputService Input { get; private set; }
-        public TextInputService TextInput { get; } = new();
-        private bool _textInputConfigured;
-
-        public void Configure(Transform anchor, List<WindowBase> prefabs)
-        {
-            _anchor = anchor;
-            _prefabs = prefabs;
-        }
-
-        public void ConfigureInput(LocalInputService input)
-        {
-            Input = input;
-            if (!_textInputConfigured)
-            {
-                _textInputConfigured = true;
-                TextInput.Register(new UnityTouchKeyboardProvider(), -100);
-                TextInput.SessionChanged += OnTextInputChanged;
-                TextInput.ProviderFailed += Debug.LogException;
-            }
-            var modules = FindObjectsByType<UnityEngine.InputSystem.UI.InputSystemUIInputModule>(FindObjectsInactive.Include, FindObjectsSortMode.None);
-            foreach (var module in modules)
-            {
-                module.actionsAsset = input.Actions;
-            }
-        }
-
-        public class Model
-        {
-        }
-
-        [SerializeField] private List<WindowBase> _prefabs;
-        [SerializeField] private Transform _anchor;
-
         private const int EnvironmentOrder = 1;
-        private readonly List<WindowBase> _instances = new();
-        private readonly Stack<WindowBase> _windowsStack = new();
 
-        public Observable<Unit> ObserveWindowOpen<T>() =>
-            CurrentWindow.Where(window => window != null && window.GetType() == typeof(T))
-                .Select(_ => _)
-                .Take(1)
-                .AsUnitObservable();
+        private readonly IAssetService _assets;
+        private readonly Dictionary<(IInternalModule, WindowBase), WindowBase> _instances = new();
+        private readonly Stack<WindowBase> _windows = new();
+        private bool _disposed;
 
-        public Observable<Unit> ObserveWindowClose<T>() =>
-            CurrentWindow.Pairwise()
-                .Where(pair => pair.Previous != null && pair.Previous.GetType() == typeof(T))
-                .Select(_ => _)
-                .Take(1)
-                .AsUnitObservable();
-
-        public Observable<Unit> ObserveWindowFullClose<T>()
-        {
-            return _windowClosedObservable.Where(closingWindowType => closingWindowType == typeof(T))
-                .Take(1)
-                .AsUnitObservable();
-        }
-
-        public ReadOnlyReactiveProperty<WindowBase> CurrentWindow => _currentWindow;
-
-        private readonly ReactiveCommand<Type> _windowClosedObservable = new();
-        private readonly ReactiveProperty<WindowBase> _currentWindow = new();
-
-        private DisposableBag _windowDisposable = new();
-
-        public static void Quit()
-        {
 #if UNITY_EDITOR
-            UnityEditor.EditorApplication.isPlaying = false;
-#else
-            Application.Quit();
+        public static Func<ITextInputProvider> EditorTextInputProviderFactory { private get; set; }
 #endif
+
+        public LocalInputService Input { get; }
+        public TextInputService TextInput { get; } = new();
+        public IBroadcaster Broadcaster { get; } = new Broadcaster();
+        public WindowBase CurrentWindow { get; private set; }
+
+        public WindowsService(IAssetService assets, LocalInputService input)
+        {
+            _assets = assets;
+            Input = input;
+            TextInput.Register(new UnityTouchKeyboardProvider(), -100);
+#if UNITY_EDITOR
+            var editorProvider = EditorTextInputProviderFactory?.Invoke();
+            if (editorProvider != null)
+            {
+                TextInput.Register(editorProvider, -1000);
+            }
+#endif
+            TextInput.Broadcaster.Subscribe<TextInputSessionChanged>(OnTextInputChanged);
+            TextInput.Broadcaster.Subscribe<TextInputProviderFailed>(OnTextInputProviderFailed);
         }
 
-        public void Open<T>(T model, bool isDisplacing = true)
+        public WindowBase Open<T>(IInternalModule module, WindowBase<T> prefab, Transform anchor, T model,
+            bool isDisplacing = true)
         {
-            if (isDisplacing)
+            if (_disposed)
             {
-                while (_windowsStack.Count > 0)
-                {
-                    var closingWindow = _windowsStack.Pop();
-
-                    closingWindow.Close();
-
-                    _windowClosedObservable.Execute(closingWindow.GetType());
-                }
+                throw new ObjectDisposedException(nameof(WindowsService));
             }
 
-            var currentWindow = GetOrCreateWindow(typeof(T));
-
-            currentWindow.SetOrder(_windowsStack.Count + EnvironmentOrder);
-
-            currentWindow.Open(model);
-
-            _windowsStack.Push(currentWindow);
-
-            OnWindowsQueueChanged();
-        }
-
-        public void Open(object model, bool isDisplacing = true)
-        {
+            var instance = GetOrCreate(module, prefab, anchor);
             if (isDisplacing)
             {
-                while (_windowsStack.Count > 0)
-                {
-                    var closingWindow = _windowsStack.Pop();
-
-                    closingWindow.Close();
-
-                    _windowClosedObservable.Execute(closingWindow.GetType());
-                }
+                CloseAll();
+            }
+            else
+            {
+                RemoveFromStack(window => window == instance);
             }
 
-            var currentWindow = GetOrCreateWindow(model.GetType());
-
-            currentWindow.SetOrder(_windowsStack.Count + EnvironmentOrder);
-
-            currentWindow.Open(model);
-
-            _windowsStack.Push(currentWindow);
-
-            OnWindowsQueueChanged();
+            instance.SetOrder(_windows.Count + EnvironmentOrder);
+            instance.Open(model);
+            _windows.Push(instance);
+            PublishCurrentWindow();
+            return instance;
         }
 
         public void Close()
         {
-            if (_windowsStack.Count > 0)
+            if (_windows.TryPop(out var window))
             {
-                var currentWindow = _windowsStack.Pop();
-
-                currentWindow.Close();
-
-                _windowClosedObservable.Execute(currentWindow.GetType());
-
-                OnWindowsQueueChanged();
+                try
+                {
+                    CloseWindow(window);
+                }
+                finally
+                {
+                    PublishCurrentWindow();
+                }
             }
+        }
+
+        public void Close(WindowBase window)
+        {
+            RemoveFromStack(candidate => ReferenceEquals(candidate, window));
         }
 
         public void CloseAll()
         {
-            while (_windowsStack.Count > 0)
-                Close();
+            RemoveFromStack(_ => true);
         }
 
-        protected override UniTask OnInit()
+        public void CloseViews(IInternalModule module)
         {
-            Disposable.Create(OnDisposed).AddTo(ref Disposables);
-            Observable.EveryUpdate().SafeSubscribe(_ => HandleCancel()).AddTo(ref Disposables);
-            return UniTask.CompletedTask;
+            RemoveFromStack(window => window && window.Owner == module);
         }
 
-        private WindowBase GetOrCreateWindow(Type modelType)
+        public void ReleaseViews(IInternalModule module)
         {
-            var instance = _instances.Find(instanceArg => instanceArg.ModelType == modelType);
+            using var cleanup = new ResourceScope();
+            QueueWindowDestruction(cleanup, owner => owner == module);
+            cleanup.Own(new ActionLease(() => CloseViews(module)));
+        }
 
-            if (instance == null)
+        public void HandleCancel()
+        {
+            if (!Input.WasPressed(GameInputAction.Cancel))
             {
-                instance = CreateWindowInstance(modelType);
+                return;
             }
 
-            return instance;
-        }
-
-        private WindowBase CreateWindowInstance(Type modelType)
-        {
-            var prefab = _prefabs.Find(windowInstanceArg => windowInstanceArg.ModelType == modelType);
-
-            var instance = GameObject.Instantiate(prefab, _anchor);
-
-            instance.Input = Input;
-            instance.CloseRequested = Close;
-            foreach (var field in instance.GetComponentsInChildren<GamepadInputField>(true))
+            if (TextInput.IsOpen)
             {
-                field.Configure(TextInput, Input);
-            }
-            _instances.Add(instance);
-
-            return instance;
-        }
-
-        private void OnDisposed()
-        {
-            TextInput.SessionChanged -= OnTextInputChanged;
-            TextInput.ProviderFailed -= Debug.LogException;
-            TextInput.Dispose();
-            _windowDisposable.Clear();
-
-            while (_windowsStack.Count > 0)
-            {
-                Close();
+                TextInput.Cancel();
+                return;
             }
 
-            foreach (var instance in _instances)
-            {
-                GameObject.Destroy(instance.gameObject);
-            }
-
-            _instances.Clear();
-            _currentWindow.Dispose();
-            _windowClosedObservable.Dispose();
+            CurrentWindow?.Cancel();
         }
 
-        private void HandleCancel()
+        public void Dispose()
         {
-            if (Input != null && Input.WasPressed(GameInputAction.Cancel))
+            if (_disposed)
             {
-                if (TextInput.IsOpen)
+                return;
+            }
+
+            _disposed = true;
+            TextInput.Broadcaster.Unsubscribe<TextInputSessionChanged>(OnTextInputChanged);
+            TextInput.Broadcaster.Unsubscribe<TextInputProviderFailed>(OnTextInputProviderFailed);
+            using var cleanup = new ResourceScope();
+            QueueWindowDestruction(cleanup, _ => true);
+            cleanup.Own(new ActionLease(CloseAll));
+            cleanup.Own(TextInput);
+        }
+
+        private void QueueWindowDestruction(ResourceScope cleanup, Predicate<IInternalModule> matches)
+        {
+            foreach (var (key, instance) in _instances)
+            {
+                if (matches(key.Item1))
                 {
-                    TextInput.Cancel();
-                    return;
+                    cleanup.Own(new ActionLease(() =>
+                    {
+                        _instances.Remove(key);
+                        DestroyWindow(instance);
+                    }));
+                }
+            }
+        }
+
+        private WindowBase GetOrCreate(IInternalModule module, WindowBase prefab, Transform anchor)
+        {
+            var key = (module, prefab);
+            if (_instances.TryGetValue(key, out var instance) && instance)
+            {
+                return instance;
+            }
+
+            instance = Object.Instantiate(prefab, anchor);
+            try
+            {
+                instance.gameObject.SetActive(false);
+                instance.Input = Input;
+                instance.CloseRequested = () =>
+                {
+                    if (CurrentWindow == instance)
+                    {
+                        Close();
+                    }
+                };
+                foreach (var field in instance.GetComponentsInChildren<GamepadInputField>(true))
+                {
+                    field.Configure(TextInput, Input);
                 }
 
-                _currentWindow.CurrentValue?.Cancel();
+                instance.Init(module, _assets);
+                _instances[key] = instance;
+                return instance;
+            }
+            catch
+            {
+                DestroyWindow(instance);
+                throw;
             }
         }
 
-        private void OnTextInputChanged()
+        private void RemoveFromStack(Predicate<WindowBase> shouldClose)
         {
-            Input?.ClearTransientInput();
+            var retained = new Stack<WindowBase>();
+            List<Exception> errors = null;
+            try
+            {
+                while (_windows.TryPop(out var window))
+                {
+                    if (shouldClose(window))
+                    {
+                        try
+                        {
+                            CloseWindow(window);
+                        }
+                        catch (Exception error)
+                        {
+                            (errors ??= new()).Add(error);
+                        }
+                    }
+                    else
+                    {
+                        retained.Push(window);
+                    }
+                }
+            }
+            finally
+            {
+                while (retained.TryPop(out var window))
+                {
+                    _windows.Push(window);
+                }
+
+                try
+                {
+                    var order = EnvironmentOrder + _windows.Count - 1;
+                    foreach (var window in _windows)
+                    {
+                        if (window)
+                        {
+                            window.SetOrder(order);
+                        }
+
+                        order--;
+                    }
+                }
+                finally
+                {
+                    PublishCurrentWindow();
+                }
+            }
+
+            if (errors != null)
+            {
+                throw new AggregateException(errors).Flatten();
+            }
         }
 
-        private void OnWindowsQueueChanged()
+        private void CloseWindow(WindowBase window)
         {
-            Input?.ClearTransientInput();
-            _currentWindow.Value = _windowsStack.Count > 0 ? _windowsStack.Peek() : null;
+            if (window)
+            {
+                window.Close();
+                Broadcaster.Broadcast(new WindowClosed(window));
+            }
+        }
+
+        private static void DestroyWindow(WindowBase window)
+        {
+            if (window)
+            {
+                try
+                {
+                    window.Dispose();
+                }
+                finally
+                {
+                    Object.Destroy(window.gameObject);
+                }
+            }
+        }
+
+        private void OnTextInputChanged(TextInputSessionChanged _) => Input.ClearTransientInput();
+
+        private static void OnTextInputProviderFailed(TextInputProviderFailed message) =>
+            Debug.LogException(message.Error);
+
+        private void PublishCurrentWindow()
+        {
+            var previous = CurrentWindow;
+            CurrentWindow = _windows.Count > 0 ? _windows.Peek() : null;
+            if (ReferenceEquals(previous, CurrentWindow))
+            {
+                return;
+            }
+
+            Input.ClearTransientInput();
+            Broadcaster.Broadcast(new CurrentWindowChanged(previous, CurrentWindow));
         }
     }
 }

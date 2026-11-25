@@ -3,7 +3,7 @@
     "rootNamespace": "Core.Lifetime",
     "references": [
         "UniTask",
-        "R3.Unity"
+        "Core.Resources"
     ],
     "noEngineReferences": false,
     "autoReferenced": true

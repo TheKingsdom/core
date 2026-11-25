@@ -26,7 +26,7 @@ There is no DI container and no service locator. A constructor receives each dep
 
 ## Module or service
 
-A service and a module do different jobs. A service has no common base type. It is an interface, for example `IAssetService`.
+A service and a module do different jobs. A service has no common base type. The client creates an ordinary class and can expose it through an interface such as `IAssetService`.
 
 | | Service | Module |
 |---|---------|--------|
@@ -34,14 +34,14 @@ A service and a module do different jobs. A service has no common base type. It 
 | Lifetime | The application. | From `Start` to `Dispose`. |
 | Made in | `Client.CreateServices` | `Client.CreateModules` |
 | Base type | None | `IModule`, `BaseModule` |
-| Events | Has no event bus. Does not send events. | `BaseModule` gives it its own `ViewBroadcaster` for its views. |
+| Events | Can publish changes to service state. | `BaseModule` gives it its own `Broadcaster` for its views. |
 | Dependencies | Can use another service. Does not use a module. | Can use services and the modules that were made before it. |
-| Disposed by | Nobody | `ModuleScope`, in reverse order |
+| Disposed by | `Client.DisposeServices` for disposable services | `ModuleScope`, in reverse order |
 
 Use these rules to choose:
 
 - If the code only answers calls, make a service.
-- If the code keeps state that changes while the game runs, or sends events, make a module.
+- If the code owns views or coordinates behavior in a scope, make a module.
 - Do not make a module that only passes calls to a service. Give the service to the modules that need it.
 
 ## Rules

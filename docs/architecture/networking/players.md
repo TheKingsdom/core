@@ -36,7 +36,7 @@ The network service publishes `InRoom` only after this sequence completes.
 
 Release partial resources inside a callback that throws before it returns its lease.
 Do not hide required initialization in an unobserved task. The loading window depends on this callback's completion.
-The demo callback binds input. Your callback can also prepare a camera or HUD.
+The session module binds input. A local initialization callback can supply other player resources.
 
 ## Reconnect and ownership
 
@@ -45,10 +45,10 @@ A later request with the same identity binds that existing body and repeats loca
 `PlayerService.TryGet` returns only a connected body for the requested peer.
 `FindIdentity` can also return a retained disconnected body.
 
-The scene director and avatar network objects use the Master Client Object flag in the demo.
+The scene director and avatar network objects use the Master Client Object flag in the test fixture.
 The Shared master owns their state. The remaining master takes authority when that owner leaves.
 This model does not give each client state authority over its own avatar.
-Game components must send authorized requests to the current state authority, as `DemoAvatar` does.
+Game components must send authorized requests to the current state authority.
 
 The room must retain a peer for body restore. No durable body store exists after the last peer leaves.
 Refer to [Testing](../../testing.md) for the real two-peer reconnect and authority test.

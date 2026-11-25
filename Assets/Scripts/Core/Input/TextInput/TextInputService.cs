@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Core.Infra.Messaging;
 
 namespace Core.Input.TextInput
 {
@@ -9,8 +10,7 @@ namespace Core.Input.TextInput
         private Session _active;
         private bool _disposed;
 
-        public event Action SessionChanged;
-        public event Action<Exception> ProviderFailed;
+        public IBroadcaster Broadcaster { get; } = new Broadcaster();
         public bool IsOpen => _active != null;
 
         public IDisposable Register(ITextInputProvider provider, int priority = 0)
@@ -39,7 +39,7 @@ namespace Core.Input.TextInput
                     if (!registration.Provider.IsAvailable(request)) continue;
                     session = new Session(this, registration, request, completed);
                     _active = session;
-                    SessionChanged?.Invoke();
+                    Broadcaster.Broadcast(new TextInputSessionChanged(IsOpen));
                     if (session.Finished) return session;
                     var lease = registration.Provider.Open(request, session.Complete);
                     session.Attach(lease);
@@ -47,7 +47,7 @@ namespace Core.Input.TextInput
                 }
                 catch (Exception error)
                 {
-                    ProviderFailed?.Invoke(error);
+                    Broadcaster.Broadcast(new TextInputProviderFailed(error));
                     if (session != null && session.Finished) return session;
                 }
 
@@ -68,15 +68,13 @@ namespace Core.Input.TextInput
             _disposed = true;
             Cancel();
             _providers.Clear();
-            SessionChanged = null;
-            ProviderFailed = null;
         }
 
         private void Release(Session session)
         {
             if (!ReferenceEquals(_active, session)) return;
             _active = null;
-            SessionChanged?.Invoke();
+            Broadcaster.Broadcast(new TextInputSessionChanged(IsOpen));
         }
 
         private sealed class Registration : IDisposable
@@ -148,7 +146,7 @@ namespace Core.Input.TextInput
                 }
                 catch (Exception error)
                 {
-                    _owner.ProviderFailed?.Invoke(error);
+                    _owner.Broadcaster.Broadcast(new TextInputProviderFailed(error));
                 }
                 finally
                 {

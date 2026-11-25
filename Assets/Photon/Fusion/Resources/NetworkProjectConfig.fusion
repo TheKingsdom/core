@@ -97,8 +97,7 @@
     "AssembliesToWeave": [
         "Fusion.Unity",
         "Core.Networking.Fusion",
-        "Core.Networking.Players",
-        "Game"
+        "Core.Networking.Players"
     ],
     "UseSerializableDictionary": true,
     "NullChecksForNetworkedProperties": true,

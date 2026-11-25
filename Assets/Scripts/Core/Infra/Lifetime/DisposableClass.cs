@@ -1,15 +1,15 @@
 using System;
-using R3;
+using Core.Resources;
 
 namespace Core.Infra.Lifetime
 {
     public class DisposableClass : IDisposable
     {
-        protected DisposableBag Disposables;
+        protected ResourceScope Disposables;
 
         public IDisposable Init()
         {
-            Disposables = new DisposableBag();
+            Disposables = new ResourceScope();
 
             OnInit();
 
@@ -27,7 +27,7 @@ namespace Core.Infra.Lifetime
         public void Dispose()
         {
             OnDisposed();
-            Disposables.Clear();
+            Disposables.Dispose();
         }
     }
 }

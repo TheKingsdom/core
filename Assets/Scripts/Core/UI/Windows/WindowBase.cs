@@ -1,76 +1,47 @@
-using Core.Input;
 using System;
-using R3;
-using UnityEngine;
-
 using Core.Infra.Lifetime;
+using Core.Infra.Module;
+using Core.Infra.View;
+using Core.Input;
+using Core.Resources;
+using UnityEngine;
+using UnityEngine.EventSystems;
+
 namespace Core.UI.Windows
 {
     public abstract class WindowBase<T> : WindowBase
     {
-        [SerializeField] private SafeArea _safeArea;
-
-        public sealed override Type ModelType => typeof(T);
         protected T ActiveModel { get; private set; }
+        public sealed override Type ModelType => typeof(T);
 
-        protected DisposableBag Disposables = new();
-        private GameObject _lastSelected;
-
-        public sealed override void Open(object model)
+        protected sealed override void OnOpen(object model)
         {
-            Disposables.Clear();
-
             ActiveModel = (T)model;
-
-            if (Cursor.lockState == CursorLockMode.Locked)
-            {
-                Cursor.lockState = CursorLockMode.None;
-                Cursor.visible = true;
-            }
-
-            if (_safeArea)
-            {
-                _safeArea.Fit();
-            }
-
             OnOpen();
-
-            gameObject.SetActive(true);
-            Core.UI.UiNavigation.SelectFirst(gameObject, _lastSelected);
         }
 
-        public sealed override void Close()
+        protected sealed override void OnClose()
         {
-            var eventSystem = UnityEngine.EventSystems.EventSystem.current;
-            var selected = eventSystem ? eventSystem.currentSelectedGameObject : null;
-            if (selected && selected.transform.IsChildOf(transform))
-            {
-                _lastSelected = selected;
-            }
-
-            Disposables.Clear();
-
             ActiveModel = default;
-
-            this.gameObject.SetActive(false);
         }
 
         protected abstract void OnOpen();
     }
 
-    public abstract class WindowBase : MonoBehaviour
+    public abstract class WindowBase : ViewBase<IInternalModule>
     {
         [SerializeField] private Canvas _canvas;
+        [SerializeField] private SafeArea _safeArea;
 
-        public LocalInputService Input { get; internal set; }
-        internal Action CloseRequested { get; set; }
-
-        protected void CloseWindow()
-        {
-            CloseRequested?.Invoke();
-        }
+        private GameObject _lastSelected;
+        private ResourceScope _opening;
+        private bool _disposed;
 
         public abstract Type ModelType { get; }
+        public LocalInputService Input { get; internal set; }
+        internal IInternalModule Owner => Module;
+        internal Action CloseRequested { get; set; }
+        protected ResourceScope Opening => _opening;
 
         public void SetOrder(int order)
         {
@@ -82,11 +53,86 @@ namespace Core.UI.Windows
             _canvas.sortingOrder = order;
         }
 
+        public void Open(object model)
+        {
+            if (_disposed)
+            {
+                throw new ObjectDisposedException(GetType().Name);
+            }
+
+            Close();
+            _opening = new ResourceScope();
+            try
+            {
+                if (Cursor.lockState == CursorLockMode.Locked)
+                {
+                    Cursor.lockState = CursorLockMode.None;
+                    Cursor.visible = true;
+                }
+
+                if (_safeArea)
+                {
+                    _safeArea.Fit();
+                }
+
+                OnOpen(model);
+                gameObject.SetActive(true);
+                UiNavigation.SelectFirst(gameObject, _lastSelected);
+            }
+            catch
+            {
+                Close();
+                throw;
+            }
+        }
+
+        public void Close()
+        {
+            var opening = _opening;
+            if (opening == null)
+            {
+                return;
+            }
+            _opening = null;
+
+            var eventSystem = EventSystem.current;
+            var selected = eventSystem ? eventSystem.currentSelectedGameObject : null;
+            if (selected && selected.transform.IsChildOf(transform))
+            {
+                _lastSelected = selected;
+            }
+
+            try
+            {
+                opening.Dispose();
+            }
+            finally
+            {
+                try
+                {
+                    OnClose();
+                }
+                finally
+                {
+                    gameObject.SetActive(false);
+                }
+            }
+        }
+
+        protected override void ManagedDispose()
+        {
+            _disposed = true;
+            CloseRequested = null;
+            Close();
+        }
+
+        protected void CloseWindow() => CloseRequested?.Invoke();
+
         public virtual void Cancel()
         {
         }
 
-        public abstract void Open(object model);
-        public abstract void Close();
+        protected abstract void OnOpen(object model);
+        protected abstract void OnClose();
     }
 }

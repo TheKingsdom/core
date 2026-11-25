@@ -3,7 +3,7 @@
     "references": [
         "Core.Input",
         "Core.UI",
-        "Unity.ugui",
+        "UnityEngine.UI",
         "Unity.TextMeshPro",
         "Unity.InputSystem",
         "Core.Lifetime"

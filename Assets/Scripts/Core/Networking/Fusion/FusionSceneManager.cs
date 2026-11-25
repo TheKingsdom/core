@@ -1,17 +1,17 @@
-using Core.Resources;
 using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using Cysharp.Threading.Tasks;
 using Fusion;
-using R3;
+using Core.Infra.Messaging;
 using UnityEngine;
 using UnityEngine.SceneManagement;
+using Event = Core.Infra.Messaging.Event;
 
 namespace Core.Networking.Fusion
 {
-    public readonly struct SceneProgress
+    public sealed class SceneProgress : Event
     {
         public readonly NetworkRunner Runner;
         public readonly SceneRef SceneRef;
@@ -25,7 +25,7 @@ namespace Core.Networking.Fusion
         }
     }
 
-    public readonly struct SceneRegistration
+    public sealed class SceneRegistration : Event
     {
         public readonly NetworkRunner Runner;
         public readonly SceneRef SceneRef;
@@ -41,7 +41,7 @@ namespace Core.Networking.Fusion
         }
     }
 
-    public readonly struct SceneLoadFailure
+    public sealed class SceneLoadFailure : Event
     {
         public readonly NetworkRunner Runner;
         public readonly SceneRef SceneRef;
@@ -82,12 +82,7 @@ namespace Core.Networking.Fusion
             _ownedScenes.Clear();
         }
 
-        private readonly Subject<SceneProgress> _progress = new();
-        private readonly Subject<SceneRegistration> _registered = new();
-        private readonly Subject<SceneLoadFailure> _failed = new();
-        public Observable<SceneProgress> OnLoadProgress => _progress;
-        public Observable<SceneRegistration> OnRegistered => _registered;
-        public Observable<SceneLoadFailure> OnLoadFailed => _failed;
+        public IBroadcaster Broadcaster { get; } = new Broadcaster();
 
         public bool TryGetRegistration(SceneRef sceneRef, out SceneRegistration registration)
         {
@@ -110,7 +105,7 @@ namespace Core.Networking.Fusion
                 if (ShouldPublishSceneFailure(runner, completed))
                 {
                     var sceneLoadFailure = new SceneLoadFailure(runner, sceneRef, completed.Error);
-                    _failed.OnNext(sceneLoadFailure);
+                    Broadcaster.Broadcast(sceneLoadFailure);
                 }
             });
             return operation;
@@ -143,7 +138,7 @@ namespace Core.Networking.Fusion
             var loadIdText = sceneParams.LoadId.ToString();
             var record = new SceneRegistration(runner, sceneRef, actualScene, loadIdText);
             _registrations[sceneRef] = record;
-            _registered.OnNext(record);
+            Broadcaster.Broadcast(record);
         }
 
         public override NetworkSceneAsyncOp UnloadScene(SceneRef sceneRef)
@@ -161,15 +156,8 @@ namespace Core.Networking.Fusion
         protected override void OnLoadSceneProgress(SceneRef sceneRef, float progress)
         {
             var sceneProgress = new SceneProgress(Runner, sceneRef, progress);
-            _progress.OnNext(sceneProgress);
+            Broadcaster.Broadcast(sceneProgress);
             base.OnLoadSceneProgress(sceneRef, progress);
-        }
-
-        private void OnDestroy()
-        {
-            _progress.Dispose();
-            _registered.Dispose();
-            _failed.Dispose();
         }
 
         private bool CanUnloadScene(Scene scene)

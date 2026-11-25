@@ -2,7 +2,6 @@ using System;
 using System.Threading;
 using Core.Resources;
 using Cysharp.Threading.Tasks;
-using R3;
 
 namespace Core.Networking.Players
 {
@@ -10,8 +9,7 @@ namespace Core.Networking.Players
     {
         private readonly CancellationTokenSource _lifetime = new();
         private readonly ResourceScope _resources = new();
-        private readonly ReactiveProperty<PlayerAvatar> _localPlayer = new(null);
-        public ReadOnlyReactiveProperty<PlayerAvatar> LocalPlayer => _localPlayer;
+        public PlayerAvatar LocalPlayer { get; private set; }
 
         public async UniTask EnsureReadyAsync(PlayerAvatar avatar,
             Func<PlayerAvatar, CancellationToken, UniTask<IDisposable>> initialize, CancellationToken token)
@@ -26,7 +24,7 @@ namespace Core.Networking.Players
             }
             avatar.RPC_SetReady();
             await UniTask.WaitUntil(() => avatar && avatar.IsReady, cancellationToken: linked.Token);
-            _localPlayer.Value = avatar;
+            LocalPlayer = avatar;
         }
 
         public void Dispose()
@@ -47,7 +45,7 @@ namespace Core.Networking.Players
                 }
                 finally
                 {
-                    _localPlayer.Dispose();
+                    LocalPlayer = null;
                     _lifetime.Dispose();
                 }
             }

@@ -1,13 +1,13 @@
 using System;
 using System.Threading;
 using Cysharp.Threading.Tasks;
-using R3;
+using Core.Resources;
 
 namespace Core.Infra.Lifetime
 {
     public sealed class AsyncInitialization : IDisposable
     {
-        public DisposableBag Resources;
+        public ResourceScope Resources { get; } = new();
         private readonly UniTaskCompletionSource<IDisposable> _completion = new();
         private CancellationTokenSource _cancellation;
         private Action _onRelease;
@@ -64,7 +64,7 @@ namespace Core.Infra.Lifetime
                 {
                     try
                     {
-                        Resources.Clear();
+                        Resources.Dispose();
                     }
                     catch (Exception cleanup)
                     {
@@ -114,7 +114,7 @@ namespace Core.Infra.Lifetime
             }
 
             Cleanup(() => _cancellation?.Cancel());
-            Cleanup(() => Resources.Clear());
+            Cleanup(() => Resources.Dispose());
             Cleanup(() => _onRelease?.Invoke());
             if (!IsRunning)
             {

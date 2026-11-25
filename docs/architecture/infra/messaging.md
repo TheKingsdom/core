@@ -31,7 +31,7 @@ Refer to [logging](logging.md).
 | Bus | Holder | Use |
 |-----|--------|-----|
 | Client broadcaster | `Client.Broadcaster`. Refer to [bootstrap](bootstrap.md). | Events between modules |
-| Module broadcaster | `BaseModule.ViewBroadcaster`. `IInternalModule.Broadcaster` gives it to the views. Refer to [module](module.md). | Events from a module to its own views |
+| Module broadcaster | `BaseModule.Broadcaster`. `IInternalModule.Broadcaster` gives it to the views. Refer to [module](module.md). | Events from a module to its own views |
 
 ## Conventions
 

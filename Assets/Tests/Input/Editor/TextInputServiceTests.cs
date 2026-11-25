@@ -54,7 +54,7 @@ namespace Core.Tests.Input
         {
             var errors = 0;
             var fallback = new Provider();
-            _service.ProviderFailed += _ => errors++;
+            _service.Broadcaster.Subscribe<TextInputProviderFailed>(_ => errors++);
             _service.Register(fallback);
             _service.Register(new Provider { Throw = true }, 100);
             _service.Open(_request, _ => { });

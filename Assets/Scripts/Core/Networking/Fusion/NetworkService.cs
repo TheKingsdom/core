@@ -1,38 +1,35 @@
-using Core.Resources;
 using System;
 using System.Collections.Generic;
 using Core.Networking.Core;
-using Core.Infra.Lifetime;
+using Core.Infra.Messaging;
 using Cysharp.Threading.Tasks;
 using Fusion;
 using Fusion.Sockets;
-using R3;
+using UnityEngine;
 
 
 namespace Core.Networking.Fusion
 {
-    public partial class NetworkService : DisposableBehaviour<NetworkService.Model>, INetworkRunnerCallbacks
+    public partial class NetworkService : IDisposable, INetworkRunnerCallbacks
     {
-        public sealed class Model { }
         public SceneRef? InitialScene { get; set; }
         private const int EmptyRoomTtlMilliseconds = 60_000;
         private NetworkRunner _runner => _session?.Runner;
         private string _connectedRegion;
-        private LocalPlayerIdentity _identity;
-        public ReconnectStore Reconnect { get; private set; }
-        public LobbyDirectory Directory { get; private set; }
-        private readonly ReactiveProperty<ConnectionState> _connectionState = new(global::Core.Networking.Fusion.ConnectionState.Disconnected);
-        private readonly ReactiveProperty<PlayerRef[]> _roomPlayers = new(Array.Empty<PlayerRef>());
-        private readonly ReactiveProperty<bool> _isSessionOwner = new(false);
-        private readonly Subject<bool> _onUnexpectedDisconnect = new();
-        private readonly Subject<string> _onConnectionError = new();
-        private readonly Subject<NetworkEvent> _events = new();
-        public ReadOnlyReactiveProperty<ConnectionState> ConnectionState => _connectionState;
-        public ReadOnlyReactiveProperty<PlayerRef[]> RoomPlayers => _roomPlayers;
-        public ReadOnlyReactiveProperty<bool> IsSessionOwner => _isSessionOwner;
-        public Observable<NetworkEvent> Events => _events;
-        public Observable<bool> OnUnexpectedDisconnect => _onUnexpectedDisconnect;
-        public Observable<string> OnConnectionError => _onConnectionError;
+        private readonly LocalPlayerIdentity _identity;
+        public ReconnectStore Reconnect { get; }
+        public LobbyDirectory Directory { get; }
+        public IBroadcaster Broadcaster { get; } = new Broadcaster();
+        public ConnectionState ConnectionState => Snapshot.Phase switch
+        {
+            ConnectionPhase.ConnectingLobby or ConnectionPhase.Disconnecting => global::Core.Networking.Fusion.ConnectionState.Connecting,
+            ConnectionPhase.Lobby => global::Core.Networking.Fusion.ConnectionState.Lobby,
+            ConnectionPhase.JoiningRoom => global::Core.Networking.Fusion.ConnectionState.Joining,
+            ConnectionPhase.InRoom => global::Core.Networking.Fusion.ConnectionState.InRoom,
+            _ => global::Core.Networking.Fusion.ConnectionState.Disconnected
+        };
+        public IReadOnlyList<PlayerRef> RoomPlayers => Snapshot.Peers;
+        public bool IsSessionOwner => Snapshot.IsOwner;
         public NetworkRunner Runner => _runner;
         public NetworkSceneLoader SceneLoader => _session?.Scenes;
 
@@ -51,7 +48,7 @@ namespace Core.Networking.Fusion
             return _session.Input.Register(source);
         }
 
-        private void Update()
+        internal void UpdateSession()
         {
             if (HasSessionOwnershipChanged())
             {
@@ -105,14 +102,7 @@ namespace Core.Networking.Fusion
                 return;
             }
 
-            var wasInRoom = _connectionState.Value == global::Core.Networking.Fusion.ConnectionState.InRoom;
-            if (!wasInRoom)
-            {
-                return;
-            }
-
-            PublishPhase(ConnectionPhase.Disconnected);
-            _onUnexpectedDisconnect.OnNext(false);
+            HandleUnexpectedDisconnect(runner);
         }
 
         void INetworkRunnerCallbacks.OnShutdown(NetworkRunner runner, ShutdownReason shutdownReason)
@@ -122,14 +112,7 @@ namespace Core.Networking.Fusion
                 return;
             }
 
-            var wasInRoom = _connectionState.Value == global::Core.Networking.Fusion.ConnectionState.InRoom;
-            if (!wasInRoom)
-            {
-                return;
-            }
-
-            PublishPhase(ConnectionPhase.Disconnected);
-            _onUnexpectedDisconnect.OnNext(false);
+            HandleUnexpectedDisconnect(runner);
         }
 
         void INetworkRunnerCallbacks.OnConnectFailed(NetworkRunner runner, NetAddress remoteAddress,
@@ -147,7 +130,7 @@ namespace Core.Networking.Fusion
 
             PublishPhase(ConnectionPhase.Disconnected);
             var value = ConnectFailedReasonToString(reason);
-            _onConnectionError.OnNext(value);
+            Broadcaster.Broadcast(new NetworkConnectionFailed(value));
         }
 
         private static string ConnectFailedReasonToString(NetConnectFailedReason reason) => reason switch
@@ -219,31 +202,50 @@ namespace Core.Networking.Fusion
         {
         }
 
-        protected override void OnDestroy()
+        public void Dispose()
         {
+            if (_disposed)
+            {
+                return;
+            }
+
             _disposed = true;
             Operations.Dispose();
             var session = _session;
+            _session = null;
             if (session != null)
             {
                 _epochs.Retire(session.Runner, session.Generation);
                 session.StopOnOwnerDestroyedAsync().Forget();
             }
+        }
 
-            base.OnDestroy();
-            _events.Dispose();
-            _snapshot.Dispose();
-            _connectionState.Dispose();
-            _roomPlayers.Dispose();
-            _isSessionOwner.Dispose();
-            _onUnexpectedDisconnect.Dispose();
-            _onConnectionError.Dispose();
+        private void HandleUnexpectedDisconnect(NetworkRunner runner)
+        {
+            if (Snapshot.Phase != ConnectionPhase.InRoom)
+            {
+                return;
+            }
 
+            PublishPhase(ConnectionPhase.Disconnected);
+            Broadcaster.Broadcast(new NetworkDisconnected());
+            ReleaseDisconnectedRunnerAsync(runner).Forget(Debug.LogException);
+        }
+
+        private async UniTask ReleaseDisconnectedRunnerAsync(NetworkRunner runner)
+        {
+            // Leave outside Fusion's callback and skip if another operation has taken over.
+            await UniTask.NextFrame();
+            if (AcceptCallback(runner) && Snapshot.Phase == ConnectionPhase.Disconnected && !Operations.IsBusy)
+            {
+                await LeaveSessionAsync(LeaveMode.KeepReconnect);
+            }
         }
 
         private bool HasSessionOwnershipChanged()
         {
-            return _snapshot.CurrentValue.Phase == ConnectionPhase.InRoom && AcceptCallback(_runner) && _snapshot.CurrentValue.IsOwner != _runner.IsLocalPlayerSessionOwner();
+            return Snapshot.Phase == ConnectionPhase.InRoom && AcceptCallback(_runner) &&
+                Snapshot.IsOwner != _runner.IsLocalPlayerSessionOwner();
         }
     }
 }
