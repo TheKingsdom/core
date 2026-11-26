@@ -19,6 +19,9 @@ Responsibility: [Game starter](../game-starter.md).
 | Folder | Content | Page |
 |--------|---------|------|
 | `Bootstrap` | `GameClient` and its hooks. | [Game/Bootstrap](bootstrap.md) |
+| `Session` | Session commands and game view. | [Game/Session](session.md) |
+| `Windows` | Window ownership, views, and hooks. | [Game/Windows](windows.md) |
+| `Editor` | Play from the bootstrap scene. | [Game/Editor](editor.md) |
 
 ## Folder pages
 

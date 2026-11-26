@@ -1,0 +1,12 @@
+{
+    "name": "Core.Networking.Tests",
+    "references": [
+        "Core.Networking.Core"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "optionalUnityReferences": [
+        "TestAssemblies"
+    ]
+}

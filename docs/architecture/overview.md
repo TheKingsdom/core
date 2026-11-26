@@ -2,7 +2,7 @@
 
 ## Assemblies
 
-The code is in `Assets/Scripts`. It has two assembly definitions.
+The code is in `Assets/Scripts`. The core infrastructure and game entry point use these assemblies.
 
 | Assembly | Path | References | Purpose |
 |----------|------|------------|---------|
@@ -36,7 +36,8 @@ The folder pages are in `docs/architecture/infra`, `docs/architecture/services` 
 | [Diagnostics](diagnostics.md) | [Infra/Logging](infra/logging.md), [Infra/Utils](infra/utils.md) |
 | [Asset management](asset-management.md) | [Services/Asset](services/asset/README.md), [Services/Asset/Resource](services/asset/resource.md), [Services/Asset/Addressable](services/asset/addressable.md) |
 | [Records](records.md) | [Services/Data](services/data.md) |
-| [Game starter](game-starter.md) | [Game](game/README.md), [Game/Bootstrap](game/bootstrap.md) |
+| [Game starter](game-starter.md) | [Game](game/README.md), [Game/Bootstrap](game/bootstrap.md), [Game/Editor](game/editor.md) |
+| [Coop sessions](coop-sessions.md) | [Game/Session](game/session.md), [Game/Windows](game/windows.md), [Networking](networking/README.md), [Windows](ui/windows.md) |
 
 The scene that starts the game is `Assets/Scenes/ClientScene.unity`. It is the only scene in the build settings.
 
@@ -46,7 +47,7 @@ The scene that starts the game is `Assets/Scenes/ClientScene.unity`. It is the o
 - **A module holds the behavior. A view holds the presentation.** Refer to [Modules and views](modules-and-views.md).
 - **Events separate modules from views.** Refer to [Messaging](messaging.md).
 - **A module marks the hooks that it wants with an interface.** For example `IGameStarted`. The scope calls each module that implements it. Refer to [Messaging](messaging.md#hooks).
-- **A service lives as long as the application.** `Client` makes each service one time. A service has no events and no `Start`. Refer to [Module or service](bootstrap-and-lifecycle.md#module-or-service).
+- **A service lives as long as the application.** `Client` makes each service one time. The client releases disposable services when it is destroyed. Refer to [Module or service](bootstrap-and-lifecycle.md#module-or-service).
 
 ## Boot sequence
 

@@ -11,7 +11,7 @@ namespace Core.Infra.Bootstrap
 {
     public class Client : MonoBehaviour
     {
-        public IBroadcaster Broadcaster { get; private set; }
+        protected IBroadcaster Broadcaster { get; private set; }
 
         protected ModuleScope Modules { get; private set; }
         protected IAssetService Assets { get; private set; }
@@ -28,7 +28,14 @@ namespace Core.Infra.Bootstrap
 
         private void OnDestroy()
         {
-            Modules.Dispose();
+            try
+            {
+                Modules.Dispose();
+            }
+            finally
+            {
+                DisposeServices();
+            }
         }
 
         private async UniTask Boot()
@@ -49,8 +56,14 @@ namespace Core.Infra.Bootstrap
 
         protected virtual void CreateServices()
         {
-            Assets = new ResourcesAssetService();
+            Assets = CreateAssetService();
             Records = new RecordService(Assets);
+        }
+
+        protected virtual IAssetService CreateAssetService() => new ResourcesAssetService();
+
+        protected virtual void DisposeServices()
+        {
         }
 
         protected virtual UniTask InitializeServices()

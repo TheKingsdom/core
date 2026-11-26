@@ -1,0 +1,6 @@
+{
+    "name": "Game.Editor",
+    "includePlatforms": [
+        "Editor"
+    ]
+}

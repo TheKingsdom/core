@@ -1,6 +1,6 @@
 # Game/Bootstrap
 
-Source folder: `Assets/Scripts/Game/Bootstrap`. Files: `GameClient.cs`, `GameStarted.cs`, `IGameStarted.cs`. The namespace is `Game.Bootstrap`.
+Source folder: `Assets/Scripts/Game/Bootstrap`. Files: `GameClient.cs`, `GameStarted.cs`, `IGameStarted.cs`, `NetworkSnapshotChanged.cs`, `INetworkSnapshotChanged.cs`. The namespace is `Game.Bootstrap`.
 
 Responsibilities: [Game starter](../game-starter.md), [Messaging](../messaging.md#hooks), [Bootstrap and lifecycle](../bootstrap-and-lifecycle.md).
 
@@ -16,8 +16,8 @@ This folder holds the class that starts the game and the hooks that this class b
 
 | Method | Behavior now |
 |--------|--------------|
-| `CreateModules` | Calls the base method. Has no modules. Add the modules of the game here. Binds `GameStarted` to `IGameStarted` with `BindAsync`. |
-| `StartGame` | Calls the base method. Writes "Game started" to the log. Broadcasts `GameStarted` and waits for the handlers. Start the game here. |
+| `CreateModules` | Calls the base method. Binds the game hooks. Adds the windows and session modules when the session record specifies a scene. |
+| `StartGame` | Calls the base method. Writes "Game started" to the log. Broadcasts `GameStarted` and waits for the handlers. |
 
 A method that you add to these calls must call the base method first.
 
@@ -30,6 +30,9 @@ A hook lives in the same folder and has the same namespace as its invoker. The i
 | Event | Interface | Invoker | When it fires |
 |-------|-----------|---------|---------------|
 | `GameStarted` (`AsyncEvent`) | `IGameStarted` with `UniTask OnGameStarted()` | `GameClient` | `GameClient.StartGame` broadcasts it with `BroadcastAsync`, after the modules start. It waits for each handler. |
+| `NetworkSnapshotChanged` (`Event`) | `INetworkSnapshotChanged.OnNetworkSnapshotChanged` | `GameClient` | The client receives a snapshot from `NetworkService`. |
+
+`GameClient` also binds the [window hook](windows.md#hooks).
 
 `GameClient.CreateModules` connects the event to the interface:
 
@@ -57,3 +60,9 @@ Use the skill [`create-hook`](../../../.claude/skills/create-hook/SKILL.md). It 
 
 - A hook without a `Bind` call reaches no module. The code does not report it.
 - A module that is added after the event does not receive that event. The scope does not replay events.
+
+## Session startup
+
+When `SessionRecord` supplies a scene path, `GameClient` adds `WindowsModule` and then `SessionModule`. Both get their settings from `RecordSO` assets in `RecordsStorage`. `GameStarted` first preloads the loading window and then runs a configured startup join or reconnect. The session module creates the game view after scene registration and local player readiness.
+
+`Client.OnDestroy` releases the module scope before it calls `DisposeServices`.

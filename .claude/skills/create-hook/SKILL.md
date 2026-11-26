@@ -100,7 +100,7 @@ Use the first line for a sync hook and the second for an async hook. A hook with
 
 ## 5. Broadcast the event
 
-The invoker broadcasts the event on the client bus (`Client.Broadcaster`, or the `IBroadcaster` that the module receives in its constructor). Never use `BaseModule.ViewBroadcaster`. This bus is only for a module and its views.
+The invoker broadcasts the event on the client bus (`Client.Broadcaster`, or the `IBroadcaster` that the module receives in its constructor). Never use `BaseModule.Broadcaster`. This bus is only for a module and its views.
 
 ```csharp
 Broadcaster.Broadcast(new UserConnected(user));

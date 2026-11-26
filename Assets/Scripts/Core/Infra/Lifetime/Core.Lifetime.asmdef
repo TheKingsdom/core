@@ -1,0 +1,7 @@
+{
+    "name": "Core.Lifetime",
+    "rootNamespace": "Core.Lifetime",
+    "references": [],
+    "noEngineReferences": false,
+    "autoReferenced": true
+}
