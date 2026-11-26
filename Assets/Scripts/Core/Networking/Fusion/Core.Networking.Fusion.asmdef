@@ -6,8 +6,6 @@
         "Fusion.Unity",
         "UniTask",
         "Core",
-        "Core.Resources",
-        "Core.Lifetime",
         "Photon.Realtime"
     ],
     "autoReferenced": true,

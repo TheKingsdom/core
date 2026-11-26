@@ -55,6 +55,7 @@ namespace Core.Networking.Players
             {
                 return;
             }
+            var rosterChanged = false;
             foreach (var record in _context.Players.Avatars)
             {
                 var avatar = record.Avatar;
@@ -62,7 +63,13 @@ namespace Core.Networking.Players
                 {
                     avatar.MarkDisconnected();
                     _context.Players.Refresh(avatar);
+                    rosterChanged = true;
                 }
+            }
+
+            if (rosterChanged)
+            {
+                PublishConfirmedPlayers();
             }
         }
 
@@ -125,6 +132,11 @@ namespace Core.Networking.Players
                 return;
             }
             Admission.Confirm(request, avatar.Object.Id.Raw, avatar.Player == source, avatar.Identity == identity);
+            PublishConfirmedPlayers();
+        }
+
+        private void PublishConfirmedPlayers()
+        {
             Runner.SessionInfo.UpdateCustomProperties(new Dictionary<string, SessionProperty>
             {
                 [LobbyDirectory.ConfirmedPlayersPropertyKey] = _context.Players.Avatars.Count(record => record.Avatar && !record.Avatar.IsDisconnected)

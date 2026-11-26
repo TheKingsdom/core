@@ -2,46 +2,19 @@ using System;
 using Core.Infra.Lifetime;
 using Core.Infra.Module;
 using Core.Infra.View;
-using Core.Input;
-using Core.Resources;
 using UnityEngine;
 using UnityEngine.EventSystems;
 
 namespace Core.UI.Windows
 {
-    public abstract class WindowBase<T> : WindowBase
-    {
-        protected T ActiveModel { get; private set; }
-        public sealed override Type ModelType => typeof(T);
-
-        protected sealed override void OnOpen(object model)
-        {
-            ActiveModel = (T)model;
-            OnOpen();
-        }
-
-        protected sealed override void OnClose()
-        {
-            ActiveModel = default;
-        }
-
-        protected abstract void OnOpen();
-    }
-
-    public abstract class WindowBase : ViewBase<IInternalModule>
+    public abstract class WindowBase<TModule> : ViewBase<TModule> where TModule : class, IInternalModule
     {
         [SerializeField] private Canvas _canvas;
         [SerializeField] private SafeArea _safeArea;
 
         private GameObject _lastSelected;
-        private ResourceScope _opening;
+        private bool _open;
         private bool _disposed;
-
-        public abstract Type ModelType { get; }
-        public LocalInputService Input { get; internal set; }
-        internal IInternalModule Owner => Module;
-        internal Action CloseRequested { get; set; }
-        protected ResourceScope Opening => _opening;
 
         public void SetOrder(int order)
         {
@@ -49,11 +22,12 @@ namespace Core.UI.Windows
             {
                 _canvas = GetComponent<Canvas>();
             }
+
             _canvas.overrideSorting = true;
             _canvas.sortingOrder = order;
         }
 
-        public void Open(object model)
+        public void Open()
         {
             if (_disposed)
             {
@@ -61,7 +35,7 @@ namespace Core.UI.Windows
             }
 
             Close();
-            _opening = new ResourceScope();
+            _open = true;
             try
             {
                 if (Cursor.lockState == CursorLockMode.Locked)
@@ -70,13 +44,13 @@ namespace Core.UI.Windows
                     Cursor.visible = true;
                 }
 
+                OnOpen();
+                gameObject.SetActive(true);
                 if (_safeArea)
                 {
                     _safeArea.Fit();
                 }
 
-                OnOpen(model);
-                gameObject.SetActive(true);
                 UiNavigation.SelectFirst(gameObject, _lastSelected);
             }
             catch
@@ -88,51 +62,45 @@ namespace Core.UI.Windows
 
         public void Close()
         {
-            var opening = _opening;
-            if (opening == null)
+            if (!_open)
             {
                 return;
             }
-            _opening = null;
 
-            var eventSystem = EventSystem.current;
-            var selected = eventSystem ? eventSystem.currentSelectedGameObject : null;
-            if (selected && selected.transform.IsChildOf(transform))
-            {
-                _lastSelected = selected;
-            }
-
+            _open = false;
             try
             {
-                opening.Dispose();
+                var eventSystem = EventSystem.current;
+                var selected = eventSystem ? eventSystem.currentSelectedGameObject : null;
+                if (selected && selected.transform.IsChildOf(transform))
+                {
+                    _lastSelected = selected;
+                }
+
+                OnClose();
             }
             finally
             {
-                try
-                {
-                    OnClose();
-                }
-                finally
-                {
-                    gameObject.SetActive(false);
-                }
+                gameObject.SetActive(false);
             }
         }
 
         protected override void ManagedDispose()
         {
             _disposed = true;
-            CloseRequested = null;
-            Close();
+            _lastSelected = null;
         }
-
-        protected void CloseWindow() => CloseRequested?.Invoke();
 
         public virtual void Cancel()
         {
         }
 
-        protected abstract void OnOpen(object model);
-        protected abstract void OnClose();
+        protected virtual void OnOpen()
+        {
+        }
+
+        protected virtual void OnClose()
+        {
+        }
     }
 }

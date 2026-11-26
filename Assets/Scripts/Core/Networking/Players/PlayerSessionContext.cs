@@ -12,6 +12,25 @@ namespace Core.Networking.Players
         public PlayerSessionDirector Director { get; set; }
         public RunnerGeneration Generation { get; private set; }
 
+        internal void Release()
+        {
+            try
+            {
+                Bootstrap?.Dispose();
+            }
+            finally
+            {
+                try
+                {
+                    Spawning?.Dispose();
+                }
+                finally
+                {
+                    Players?.Dispose();
+                }
+            }
+        }
+
         public void Configure(PlayerService players, RunnerGeneration generation)
         {
             Players = players;

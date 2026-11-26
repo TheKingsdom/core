@@ -1,9 +1,7 @@
 # Lifetime
 
-Source folder: `Assets/Scripts/Core/Infra/Lifetime`. Files: AsyncInitialization.cs, DisposableBehaviour.cs, DisposableClass.cs, ReactiveExtensions.cs, SafeArea.cs.
+Source folder `Assets/Scripts/Core/Infra/Lifetime`. File `SafeArea.cs`.
 
-Responsibility: [Coop sessions](../coop-sessions.md).
+`SafeArea` adjusts its RectTransform anchors to the safe screen bounds. The [window base](../ui/windows.md) fits the safe area after it activates the window.
 
-## Purpose
-
-The lifetime assembly uses UniTask and resource scopes. Async initialization propagates cancellation and releases partial resources. `DisposableBehaviour<T>` supports explicit model initialization. `SafeArea` adjusts UI bounds.
+Read [Infra/Module](module.md) for the module lifecycle and [asset management](../asset-management.md) for asset instance ownership.

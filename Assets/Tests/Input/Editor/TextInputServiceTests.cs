@@ -1,5 +1,6 @@
 using System;
 using Core.Input.TextInput;
+using Core.Infra.Messaging;
 using NUnit.Framework;
 
 namespace Core.Tests.Input
@@ -7,10 +8,15 @@ namespace Core.Tests.Input
     public sealed class TextInputServiceTests
     {
         private TextInputService _service;
+        private Broadcaster _events;
         private readonly TextInputRequest _request = new("Nickname", "original", 32);
 
         [SetUp]
-        public void SetUp() => _service = new TextInputService();
+        public void SetUp()
+        {
+            _events = new Broadcaster();
+            _service = new TextInputService(_events);
+        }
 
         [TearDown]
         public void TearDown() => _service.Dispose();
@@ -54,7 +60,7 @@ namespace Core.Tests.Input
         {
             var errors = 0;
             var fallback = new Provider();
-            _service.Broadcaster.Subscribe<TextInputProviderFailed>(_ => errors++);
+            _events.Subscribe<TextInputProviderFailed>(_ => errors++);
             _service.Register(fallback);
             _service.Register(new Provider { Throw = true }, 100);
             _service.Open(_request, _ => { });

@@ -16,14 +16,13 @@ namespace Core.Input
         private readonly Dictionary<GameInputAction, string> _bindingLabels = new();
         private readonly Dictionary<StickControl, Vector2> _stickActivity = new();
         private object _player;
-        private long _bindingVersion;
         private bool _blocked = true;
         private bool _disposed;
         private readonly HashSet<GameInputAction> _requiresRelease = new();
         private readonly Dictionary<InputAction, GameInputAction> _actionCommands = new();
         private int _contextChangedFrame = -1;
 
-        public IBroadcaster Broadcaster { get; } = new Broadcaster();
+        private readonly IBroadcaster _broadcaster;
 
         public InputActionAsset Actions => _actions;
         public bool IsGamepad { get; private set; }
@@ -31,13 +30,14 @@ namespace Core.Input
         public Vector2 Move => GameplayEnabled ? GetAction(GameInputAction.Move).ReadValue<Vector2>() : Vector2.zero;
         public Vector2 PointerPosition => GetAction(GameInputAction.Point).ReadValue<Vector2>();
 
-        public LocalInputService(InputActionAsset actions)
+        public LocalInputService(InputActionAsset actions, IBroadcaster broadcaster = null)
         {
             if (!actions)
             {
                 throw new ArgumentNullException(nameof(actions));
             }
 
+            _broadcaster = broadcaster ?? new Broadcaster();
             _actions = UnityEngine.Object.Instantiate(actions);
             foreach (GameInputAction command in Enum.GetValues(typeof(GameInputAction)))
             {
@@ -59,7 +59,7 @@ namespace Core.Input
             _actions.Enable();
         }
 
-        public IDisposable BindPlayer(object player)
+        public void BindPlayer(object player)
         {
             if (_disposed)
             {
@@ -72,10 +72,20 @@ namespace Core.Input
             }
 
             _player = player;
-            _bindingVersion++;
             _blocked = true;
             ClearTransientInput();
-            return new PlayerBinding(this, _bindingVersion);
+        }
+
+        public void UnbindPlayer(object player)
+        {
+            if (_disposed || player == null || !ReferenceEquals(_player, player))
+            {
+                return;
+            }
+
+            _player = null;
+            _blocked = true;
+            ClearTransientInput();
         }
 
         public void SetGameplayBlocked(object player, bool blocked)
@@ -251,7 +261,7 @@ namespace Core.Input
             {
                 IsGamepad = false;
                 _bindingLabels.Clear();
-                Broadcaster.Broadcast(new InputDeviceChanged(IsGamepad));
+                _broadcaster.Broadcast(new InputDeviceChanged(IsGamepad));
             }
         }
 
@@ -298,7 +308,7 @@ namespace Core.Input
             {
                 IsGamepad = usesGamepad;
                 _bindingLabels.Clear();
-                Broadcaster.Broadcast(new InputDeviceChanged(IsGamepad));
+                _broadcaster.Broadcast(new InputDeviceChanged(IsGamepad));
             }
         }
 
@@ -360,35 +370,6 @@ namespace Core.Input
                 _pendingPresses.Add(command);
             }
 
-        }
-
-        private sealed class PlayerBinding : IDisposable
-        {
-            private LocalInputService _owner;
-            private readonly long _version;
-
-            public PlayerBinding(LocalInputService owner, long version)
-            {
-                _owner = owner;
-                _version = version;
-            }
-
-            public void Dispose()
-            {
-                if (_owner == null)
-                {
-                    return;
-                }
-
-                if (!_owner._disposed && _owner._bindingVersion == _version)
-                {
-                    _owner._player = null;
-                    _owner._blocked = true;
-                    _owner.ClearTransientInput();
-                }
-
-                _owner = null;
-            }
         }
     }
 }

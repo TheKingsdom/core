@@ -1,6 +1,6 @@
 using System;
+using System.Collections.Generic;
 using Core.Input;
-using Core.Resources;
 using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.InputSystem.UI;
@@ -10,44 +10,34 @@ namespace Core.UI
 {
     public sealed class UiInputBinding : IDisposable
     {
-        private readonly ResourceScope _resources = new();
+        private readonly InputSystemUIInputModule _module;
+        private readonly InputActionAsset _previousActions;
+        private readonly InputActionReference _previousPoint;
+        private readonly InputActionReference _previousClick;
+        private readonly InputActionReference _previousMove;
+        private readonly InputActionReference _previousSubmit;
+        private readonly InputActionReference _previousCancel;
+        private readonly List<InputActionReference> _references = new();
+        private bool _disposed;
 
         public UiInputBinding(InputSystemUIInputModule module, LocalInputService input)
         {
-            var oldAsset = module.actionsAsset;
-            var point = module.point;
-            var click = module.leftClick;
-            var move = module.move;
-            var submit = module.submit;
-            var cancel = module.cancel;
+            _module = module;
+            _previousActions = module.actionsAsset;
+            _previousPoint = module.point;
+            _previousClick = module.leftClick;
+            _previousMove = module.move;
+            _previousSubmit = module.submit;
+            _previousCancel = module.cancel;
 
             try
             {
-                var newPoint = Reference(input, GameInputAction.Point);
-                var newClick = Reference(input, GameInputAction.Click);
-                var newMove = Reference(input, GameInputAction.Navigate);
-                var newSubmit = Reference(input, GameInputAction.Submit);
-                var newCancel = Reference(input, GameInputAction.Cancel);
-
-                _resources.Own(new ActionLease(() =>
-                {
-                    if (module)
-                    {
-                        module.actionsAsset = oldAsset;
-                        module.point = point;
-                        module.leftClick = click;
-                        module.move = move;
-                        module.submit = submit;
-                        module.cancel = cancel;
-                    }
-                }));
-
                 module.actionsAsset = input.Actions;
-                module.point = newPoint;
-                module.leftClick = newClick;
-                module.move = newMove;
-                module.submit = newSubmit;
-                module.cancel = newCancel;
+                module.point = Reference(input, GameInputAction.Point);
+                module.leftClick = Reference(input, GameInputAction.Click);
+                module.move = Reference(input, GameInputAction.Navigate);
+                module.submit = Reference(input, GameInputAction.Submit);
+                module.cancel = Reference(input, GameInputAction.Cancel);
             }
             catch
             {
@@ -56,22 +46,47 @@ namespace Core.UI
             }
         }
 
-        public void Dispose() => _resources.Dispose();
+        public void Dispose()
+        {
+            if (_disposed)
+            {
+                return;
+            }
+
+            _disposed = true;
+            try
+            {
+                if (_module)
+                {
+                    _module.actionsAsset = _previousActions;
+                    _module.point = _previousPoint;
+                    _module.leftClick = _previousClick;
+                    _module.move = _previousMove;
+                    _module.submit = _previousSubmit;
+                    _module.cancel = _previousCancel;
+                }
+            }
+            finally
+            {
+                foreach (var reference in _references)
+                {
+                    if (Application.isPlaying)
+                    {
+                        Object.Destroy(reference);
+                    }
+                    else
+                    {
+                        Object.DestroyImmediate(reference);
+                    }
+                }
+                _references.Clear();
+            }
+        }
 
         private InputActionReference Reference(LocalInputService input, GameInputAction command)
         {
             var reference = InputActionReference.Create(input.GetAction(command));
-            _resources.Own(new ActionLease(() =>
-            {
-                if (Application.isPlaying)
-                {
-                    Object.Destroy(reference);
-                }
-                else
-                {
-                    Object.DestroyImmediate(reference);
-                }
-            }));
+            _references.Add(reference);
             return reference;
         }
     }

@@ -4,8 +4,6 @@
     "references": [
         "Core.Networking.Core",
         "Core.Networking.Fusion",
-        "Core.Resources",
-        "Core.Lifetime",
         "Fusion.Unity",
         "Core",
         "UniTask"

@@ -1,4 +1,4 @@
-using Core.Resources;
+using Core.Infra.Messaging;
 using System;
 using System.Threading;
 using System.Threading.Tasks;
@@ -14,27 +14,30 @@ namespace Core.Networking.Fusion
         private readonly GameObject _gameObject;
         private readonly NetworkService _service;
         private bool _callbacksRegistered;
-        private readonly ResourceScope _resources = new();
+        private readonly IRunnerScopeInstaller _installer;
         private readonly ShutdownBarrier _shutdown;
 
         public NetworkRunner Runner { get; }
         public FusionSceneManager SceneManager { get; }
         public NetworkSceneLoader Scenes { get; }
         public RunnerGeneration Generation { get; }
-        public LeaseSlot<IPlayerInputSource> Input { get; } = new();
+        public IPlayerInputSource Input { get; set; }
         public bool IsStopping => _shutdown.IsStarted;
         public bool IsCleaned => _shutdown.IsCleaned;
         public const int ShutdownTimeoutSeconds = 20;
 
-        public FusionRunnerSession(NetworkService service, RunnerGeneration generation)
+        public FusionRunnerSession(NetworkService service, RunnerGeneration generation, IRunnerScopeInstaller installer)
         {
             Generation = generation;
             _service = service;
+            _installer = installer;
             _gameObject = new GameObject($"NetworkRunner G{generation}");
             UnityEngine.Object.DontDestroyOnLoad(_gameObject);
             Runner = _gameObject.AddComponent<NetworkRunner>();
             SceneManager = _gameObject.AddComponent<FusionSceneManager>();
-            Scenes = new NetworkSceneLoader(Runner, SceneManager, generation);
+            var sceneEvents = new Broadcaster();
+            SceneManager.SetBroadcaster(sceneEvents);
+            Scenes = new NetworkSceneLoader(Runner, SceneManager, generation, sceneEvents);
             _gameObject.AddComponent<NetworkServiceLink>().SetService(service);
             _shutdown = new ShutdownBarrier(
                 async () =>
@@ -62,7 +65,7 @@ namespace Core.Networking.Fusion
                 });
         }
 
-        public void Own(IDisposable resource) => _resources.Own(resource);
+        public void Install() => _installer.Install(Runner, Generation);
 
         public void ActivateCallbacks()
         {
@@ -76,11 +79,10 @@ namespace Core.Networking.Fusion
             TrackOwnershipAsync().Forget(Debug.LogException);
         }
 
-        public UniTask PrepareRoomAsync(IRunnerScopeInstaller installer, CreateSessionRequest creation,
-            CancellationToken token)
-        {
-            return installer.PrepareRoomAsync(Runner, Generation, creation, token);
-        }
+        public UniTask PrepareRoomAsync(CreateSessionRequest creation, CancellationToken token) =>
+            _installer.PrepareRoomAsync(Runner, Generation, creation, token);
+
+        public UniTask PrepareLeaveAsync() => _installer.PrepareLeaveAsync(Runner, Generation);
 
         private async UniTask TrackOwnershipAsync()
         {
@@ -109,11 +111,10 @@ namespace Core.Networking.Fusion
                 Runner.RemoveCallbacks(_service);
             }
 
-            Scenes.Dispose();
-            Input.Dispose();
+            Input = null;
             try
             {
-                _resources.Dispose();
+                _installer.Release(Runner, Generation);
             }
             finally
             {

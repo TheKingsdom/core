@@ -1,7 +1,0 @@
-{
-    "name": "Core.Resources",
-    "rootNamespace": "Core.Resources",
-    "references": [],
-    "noEngineReferences": true,
-    "autoReferenced": true
-}

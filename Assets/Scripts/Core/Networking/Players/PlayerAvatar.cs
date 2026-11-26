@@ -1,4 +1,3 @@
-using System;
 using Core.Networking.Fusion;
 using Fusion;
 using UnityEngine;
@@ -12,14 +11,15 @@ namespace Core.Networking.Players
         [Networked] public NetworkBool IsDisconnected { get; private set; }
         [Networked] public NetworkBool IsReady { get; private set; }
         private PlayerService _players;
-        private IDisposable _registration;
+        private NetworkId _registrationId;
         private PlayerRef _observedPlayer;
         private bool _observedDisconnected;
 
         public override void Spawned()
         {
             _players = Runner.GetComponent<PlayerSessionContext>().Players;
-            _registration = _players.Register(this);
+            _registrationId = Object.Id;
+            _players.Register(this);
         }
 
         public override void Render()
@@ -30,13 +30,13 @@ namespace Core.Networking.Players
             }
             _observedPlayer = Player;
             _observedDisconnected = IsDisconnected;
-            _players.Refresh(this);
+            _players?.Refresh(this);
         }
 
         public override void Despawned(NetworkRunner runner, bool hasState)
         {
-            _registration?.Dispose();
-            _registration = null;
+            _players?.Unregister(_registrationId, this);
+            _players = null;
         }
 
         public void Bind(long identity, PlayerRef player)

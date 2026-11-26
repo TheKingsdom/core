@@ -19,7 +19,8 @@ namespace Core.Networking.Fusion
         private readonly LocalPlayerIdentity _identity;
         public ReconnectStore Reconnect { get; }
         public LobbyDirectory Directory { get; }
-        public IBroadcaster Broadcaster { get; } = new Broadcaster();
+        private readonly IBroadcaster _broadcaster;
+        public long LocalPlayerId => _identity.Id;
         public ConnectionState ConnectionState => Snapshot.Phase switch
         {
             ConnectionPhase.ConnectingLobby or ConnectionPhase.Disconnecting => global::Core.Networking.Fusion.ConnectionState.Connecting,
@@ -33,19 +34,32 @@ namespace Core.Networking.Fusion
         public NetworkRunner Runner => _runner;
         public NetworkSceneLoader SceneLoader => _session?.Scenes;
 
-        public IDisposable RegisterInputSource(NetworkRunner runner, IPlayerInputSource source)
+        public void RegisterInputSource(NetworkRunner runner, IPlayerInputSource source)
         {
             if (!AcceptCallback(runner))
             {
                 throw new InvalidOperationException("Runner is not current");
             }
 
-            if (_session.Input.Current != null)
+            if (source == null)
+            {
+                throw new ArgumentNullException(nameof(source));
+            }
+
+            if (_session.Input != null)
             {
                 throw new InvalidOperationException("Release the previous input binding before registering another source");
             }
 
-            return _session.Input.Register(source);
+            _session.Input = source;
+        }
+
+        public void UnregisterInputSource(NetworkRunner runner, IPlayerInputSource source)
+        {
+            if (_session != null && ReferenceEquals(_session.Runner, runner) && ReferenceEquals(_session.Input, source))
+            {
+                _session.Input = null;
+            }
         }
 
         internal void UpdateSession()
@@ -130,7 +144,7 @@ namespace Core.Networking.Fusion
 
             PublishPhase(ConnectionPhase.Disconnected);
             var value = ConnectFailedReasonToString(reason);
-            Broadcaster.Broadcast(new NetworkConnectionFailed(value));
+            _broadcaster.Broadcast(new NetworkConnectionFailed(value));
         }
 
         private static string ConnectFailedReasonToString(NetConnectFailedReason reason) => reason switch
@@ -152,7 +166,7 @@ namespace Core.Networking.Fusion
                 return;
             }
 
-            var source = _session.Input.Current;
+            var source = _session.Input;
             var data = default(NetworkInputData);
             if (source != null)
             {
@@ -222,13 +236,19 @@ namespace Core.Networking.Fusion
 
         private void HandleUnexpectedDisconnect(NetworkRunner runner)
         {
-            if (Snapshot.Phase != ConnectionPhase.InRoom)
+            var phase = Snapshot.Phase;
+            if (phase != ConnectionPhase.InRoom && phase != ConnectionPhase.Lobby)
             {
                 return;
             }
 
+            if (phase == ConnectionPhase.Lobby)
+            {
+                Directory.Reset(Generation);
+            }
+
             PublishPhase(ConnectionPhase.Disconnected);
-            Broadcaster.Broadcast(new NetworkDisconnected());
+            _broadcaster.Broadcast(new NetworkDisconnected());
             ReleaseDisconnectedRunnerAsync(runner).Forget(Debug.LogException);
         }
 

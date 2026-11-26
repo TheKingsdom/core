@@ -1,4 +1,3 @@
-using Core.Resources;
 using System;
 using System.Threading.Tasks;
 using Core.Networking.Core;

@@ -1,4 +1,3 @@
-using Core.Resources;
 using System;
 using Core.Networking.Core;
 using NUnit.Framework;
@@ -7,49 +6,6 @@ namespace Core.Tests.Networking
 {
     public sealed class InputAndRosterTests
     {
-        [Test]
-        public void T03_InputReplacementIsExclusiveAndOldDisposalCannotRemoveIt()
-        {
-            using var slot = new LeaseSlot<Action>();
-            var firstCalls = 0;
-            var secondCalls = 0;
-            var old = slot.Register(() => firstCalls++);
-            var current = slot.Register(() => secondCalls++);
-            old.Dispose();
-            for (var index = 0; index < 100; index++)
-            {
-                slot.Current();
-            }
-
-            Assert.That(firstCalls, Is.Zero);
-            var expression = Is.EqualTo(100);
-            Assert.That(secondCalls, expression);
-            current.Dispose();
-            Assert.That(slot.Current, Is.Null);
-        }
-
-        [Test]
-        public void T03_InputScopesAreIsolatedAndDisposedScopeCannotRegister()
-        {
-            var first = new LeaseSlot<object>();
-            using var second = new LeaseSlot<object>();
-            var objectValue = new object();
-            var old = first.Register(objectValue);
-            var source = new object();
-            using var current = second.Register(source);
-            first.Dispose();
-            old.Dispose();
-            Assert.That(first.Current, Is.Null);
-            var actual = second.Current;
-            var expression = Is.SameAs(source);
-            Assert.That(actual, expression);
-            Assert.Throws<ObjectDisposedException>(() =>
-                        {
-                            var objectValue2 = new object();
-                            first.Register(objectValue2);
-                        });
-        }
-
         [Test]
         public void T05_RepeatedAndReorderedRosterDoesNotReplayParticipants()
         {

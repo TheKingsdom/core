@@ -1,8 +1,7 @@
 {
     "name": "Core.Networking.Tests",
     "references": [
-        "Core.Networking.Core",
-        "Core.Resources"
+        "Core.Networking.Core"
     ],
     "includePlatforms": [
         "Editor"

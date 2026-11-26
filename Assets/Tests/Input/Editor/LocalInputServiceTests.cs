@@ -1,5 +1,6 @@
 using System;
 using Core.Input;
+using Core.Infra.Messaging;
 using NUnit.Framework;
 using UnityEditor;
 using UnityEngine;
@@ -11,7 +12,7 @@ namespace Core.Tests.Input
     {
         private LocalInputService _input;
         private object _player;
-        private IDisposable _binding;
+        private Broadcaster _events;
         private Keyboard _keyboard;
         private Gamepad _gamepad;
         private Mouse _mouse;
@@ -23,16 +24,17 @@ namespace Core.Tests.Input
             _gamepad = InputSystem.AddDevice<Gamepad>();
             _mouse = InputSystem.AddDevice<Mouse>();
             var actions = InputActionsFactory.Create();
-            _input = new LocalInputService(actions);
+            _events = new Broadcaster();
+            _input = new LocalInputService(actions, _events);
             UnityEngine.Object.DestroyImmediate(actions);
             _player = new object();
-            _binding = _input.BindPlayer(_player);
+            _input.BindPlayer(_player);
             _input.SetGameplayBlocked(_player, false);
         }
 
         public override void TearDown()
         {
-            _binding?.Dispose();
+            _input?.UnbindPlayer(_player);
             _input?.Dispose();
             base.TearDown();
         }
@@ -151,7 +153,7 @@ namespace Core.Tests.Input
         [Test]
         public void InitialHeldGamepadStateDoesNotReplaceKeyboardHints()
         {
-            _binding.Dispose();
+            _input.UnbindPlayer(_player);
             _input.Dispose();
             Set(_gamepad.rightStick, Vector2.right);
             _input = new LocalInputService(
@@ -165,7 +167,7 @@ namespace Core.Tests.Input
         {
             var keyboardLabel = _input.GetBindingLabel(GameInputAction.Jump);
             var changes = 0;
-            _input.Broadcaster.Subscribe<InputDeviceChanged>(_ => changes++);
+            _events.Subscribe<InputDeviceChanged>(_ => changes++);
             Press(_gamepad.buttonSouth);
             var gamepadLabel = _input.GetBindingLabel(GameInputAction.Jump);
             Press(_gamepad.buttonWest);
@@ -215,12 +217,12 @@ namespace Core.Tests.Input
 
 
         [Test]
-        public void DisposingOldBindingCannotRemoveReplacement()
+        public void UnbindingOldAvatarCannotRemoveReplacement()
         {
             var replacement = new object();
-            using var replacementBinding = _input.BindPlayer(replacement);
+            _input.BindPlayer(replacement);
             _input.SetGameplayBlocked(replacement, false);
-            _binding.Dispose();
+            _input.UnbindPlayer(_player);
             _input.SetGameplayBlocked(_player, true);
             Assert.That(_input.GameplayEnabled, Is.True);
         }
@@ -231,10 +233,10 @@ namespace Core.Tests.Input
             Press(_keyboard.spaceKey);
             Release(_keyboard.spaceKey);
             var replacement = new object();
-            using var replacementBinding = _input.BindPlayer(replacement);
+            _input.BindPlayer(replacement);
             _input.SetGameplayBlocked(replacement, false);
             Assert.That(_input.CollectJump(), Is.False);
-            replacementBinding.Dispose();
+            _input.UnbindPlayer(replacement);
             Assert.That(_input.GameplayEnabled, Is.False);
         }
 
@@ -262,7 +264,7 @@ namespace Core.Tests.Input
         [Test]
         public void MenuNavigationRemainsAvailableWithoutPlayerBinding()
         {
-            _binding.Dispose();
+            _input.UnbindPlayer(_player);
             Set(_gamepad.dpad, Vector2.up);
             var navigation = _input.GetAction(GameInputAction.Navigate).ReadValue<Vector2>();
             Assert.That(navigation.y, Is.EqualTo(1f).Within(0.001f));
@@ -313,7 +315,7 @@ namespace Core.Tests.Input
         {
             _input.Dispose();
             Assert.Throws<ObjectDisposedException>(() => _input.BindPlayer(_player));
-            Assert.DoesNotThrow(() => _binding.Dispose());
+            Assert.DoesNotThrow(() => _input.UnbindPlayer(_player));
         }
     }
 }

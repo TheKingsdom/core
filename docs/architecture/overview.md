@@ -37,7 +37,7 @@ The folder pages are in `docs/architecture/infra`, `docs/architecture/services` 
 | [Asset management](asset-management.md) | [Services/Asset](services/asset/README.md), [Services/Asset/Resource](services/asset/resource.md), [Services/Asset/Addressable](services/asset/addressable.md) |
 | [Records](records.md) | [Services/Data](services/data.md) |
 | [Game starter](game-starter.md) | [Game](game/README.md), [Game/Bootstrap](game/bootstrap.md), [Game/Editor](game/editor.md) |
-| [Coop sessions](coop-sessions.md) | [Game/Session](game/session.md), [Networking](networking/README.md), [Windows](ui/windows.md) |
+| [Coop sessions](coop-sessions.md) | [Game/Session](game/session.md), [Game/Windows](game/windows.md), [Networking](networking/README.md), [Windows](ui/windows.md) |
 
 The scene that starts the game is `Assets/Scenes/ClientScene.unity`. It is the only scene in the build settings.
 

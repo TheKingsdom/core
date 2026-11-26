@@ -51,8 +51,9 @@ namespace Core.Networking.Players
             try { result = await port.ExecuteSpawnAsync(request, deadline.Token); }
             catch (OperationCanceledException)
             {
-                result = Failure(request, _lifetime.IsCancellationRequested || callerToken.IsCancellationRequested
-                    ? SpawnFailure.Cancelled : SpawnFailure.Timeout);
+                var timedOut = deadline.IsCancellationRequested && !_lifetime.IsCancellationRequested &&
+                    !callerToken.IsCancellationRequested;
+                result = Failure(request, timedOut ? SpawnFailure.Timeout : SpawnFailure.Cancelled);
             }
             catch (Exception exception)
             {

@@ -40,7 +40,7 @@ public interface IModule : IDisposable
 
 `BaseModule` implements `IInternalModule`. It gives each module its own `Broadcaster`. This bus is a private channel between the module and its views. Use it only for this communication. It is not the client bus.
 
-- `BaseModule.Broadcaster` gives the module and its views the same bus.
+- The protected `BaseModule.Broadcaster` gives the module and its views the same bus.
 - Code that holds the module as its public interface cannot get this bus. The views get it through the explicit member `IInternalModule.Broadcaster`.
 - A module does not use this bus to talk to another module. A module uses the client bus for this.
 - A [hook](#hooks) is an event on the client bus. It never uses the bus of a module.
@@ -68,7 +68,7 @@ A hook lets a module react to a moment in the life of the game, for example the 
 - An event class that derives from `Event` or `AsyncEvent`.
 - An interface that a module implements to receive the hook.
 
-Core defines no hooks. A game project defines its own. A hook lives in the same folder and namespace as the code that broadcasts its event. Refer to [Hooks](../game/bootstrap.md#hooks). Use the skill [`create-hook`](../../../.claude/skills/create-hook/SKILL.md) to add a hook.
+A game project defines its module hooks. It can bind a service message published on the client bus to an interface. A hook lives in the same folder and namespace as the code that broadcasts its event. Refer to [Hooks](../game/bootstrap.md#hooks). Use the skill [`create-hook`](../../../.claude/skills/create-hook/SKILL.md) to add a hook.
 
 `Bind` connects an event to an interface. `call` receives the module and the event. `BindAsync` does the same for an `AsyncEvent`. `call` returns a `UniTask`.
 

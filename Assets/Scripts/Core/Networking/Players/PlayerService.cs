@@ -1,8 +1,6 @@
 using System;
 using System.Linq;
-using System.Collections.Generic;
 using Core.Infra.Messaging;
-using Core.Resources;
 using Core.Networking.Core;
 using Core.Networking.Fusion;
 using Fusion;
@@ -12,52 +10,46 @@ namespace Core.Networking.Players
 {
     public sealed class PlayerService : IDisposable
     {
-        private readonly Dictionary<NetworkId, AvatarIndex.Registration> _registrations = new();
         private readonly AvatarIndex _avatars = new(PlayerRef.None);
         private readonly NetworkService _network;
+        private readonly IBroadcaster _broadcaster;
         public NetworkRunner Runner { get; }
         public RunnerGeneration Generation { get; }
-        public IBroadcaster Broadcaster { get; } = new Broadcaster();
         public AvatarIndex.Record[] Avatars => _avatars.Records.ToArray();
-        public PlayerRef[] Participants { get; private set; } = Array.Empty<PlayerRef>();
+        public PlayerRef[] Participants => _network.Snapshot.Generation == Generation
+            ? _network.Snapshot.Peers.ToArray()
+            : Array.Empty<PlayerRef>();
         public bool IsDisposed { get; private set; }
 
-        public PlayerService(NetworkRunner runner, RunnerGeneration generation, NetworkService network)
+        public PlayerService(NetworkRunner runner, RunnerGeneration generation, NetworkService network,
+            IBroadcaster broadcaster = null)
         {
             Runner = runner;
             Generation = generation;
             _avatars.Changed += OnAvatarChanged;
             _network = network;
-            _network.Broadcaster.Subscribe<NetworkSnapshot>(OnSnapshot);
-            OnSnapshot(_network.Snapshot);
+            _broadcaster = broadcaster ?? new Broadcaster();
         }
 
-        private void OnSnapshot(NetworkSnapshot snapshot)
+        public void Register(PlayerAvatar avatar)
         {
-            if (snapshot.Generation == Generation)
+            _avatars.Register(avatar.Object.Id, avatar.Player, avatar, avatar.Identity, avatar.IsDisconnected);
+        }
+
+        public void Unregister(NetworkId id, PlayerAvatar avatar)
+        {
+            if (_avatars.TryGetById(id, out var record) && ReferenceEquals(record.Avatar, avatar))
             {
-                Participants = snapshot.Peers.ToArray();
+                _avatars.Unregister(id, record.Version);
             }
-        }
-
-        public IDisposable Register(PlayerAvatar avatar)
-        {
-            var id = avatar.Object.Id;
-            _registrations[id] = _avatars.Register(id, avatar.Player, avatar, avatar.Identity, avatar.IsDisconnected);
-            return new ActionLease(() =>
-            {
-                if (_registrations.Remove(id, out var registration))
-                {
-                    registration.Dispose();
-                }
-            });
         }
 
         public void Refresh(PlayerAvatar avatar)
         {
-            if (!IsDisposed && _registrations.TryGetValue(avatar.Object.Id, out var registration))
+            if (!IsDisposed && _avatars.TryGetById(avatar.Object.Id, out var record) &&
+                ReferenceEquals(record.Avatar, avatar))
             {
-                _registrations[avatar.Object.Id] = _avatars.Rebind(registration, avatar.Player, avatar.Identity, avatar.IsDisconnected);
+                _avatars.Register(record.Id, avatar.Player, avatar, avatar.Identity, avatar.IsDisconnected);
             }
         }
 
@@ -84,14 +76,13 @@ namespace Core.Networking.Players
                 return;
             }
             IsDisposed = true;
-            _network.Broadcaster.Unsubscribe<NetworkSnapshot>(OnSnapshot);
             _avatars.Changed -= OnAvatarChanged;
             _avatars.Dispose();
         }
 
         private void OnAvatarChanged(AvatarChangeKind kind, AvatarIndex.Record record)
         {
-            Broadcaster.Broadcast(new PlayerAvatarChanged(kind, record.Avatar));
+            _broadcaster.Broadcast(new PlayerAvatarChanged(kind, record.Avatar));
         }
     }
 }

@@ -2,73 +2,53 @@ using System;
 using Core.Infra.Bootstrap;
 using Core.Input;
 using Core.Networking.Fusion;
-using Core.Networking.Core;
-using Core.Resources;
-using Core.UI;
-using Core.UI.Windows;
 using Cysharp.Threading.Tasks;
-using Fusion;
 using Game.Session;
-using UnityEngine;
-using UnityEngine.InputSystem.UI;
-using UnityEngine.SceneManagement;
+using Game.Windows;
 using Log = Core.Infra.Logging.Log;
 
 namespace Game.Bootstrap
 {
     public class GameClient : Client
     {
-        [SerializeField] private string _sessionScene;
-        [SerializeField] private Transform _viewAnchor;
-        [SerializeField] private LoadingWindow _loadingWindow;
-        [SerializeField] private GameSessionView _gameView;
-        [SerializeField] private PauseWindow _pauseWindow;
-        [SerializeField] private InputSystemUIInputModule _uiInput;
-        [SerializeField] private string _startupRoom;
-        [SerializeField] private string _startupRegion;
-        [SerializeField] private bool _resumeOnStartup;
-
-        private readonly ResourceScope _services = new();
-        private LocalPlayerIdentity _identity;
         private LocalInputService _input;
-        private WindowsService _windows;
+        private NetworkService _network;
 
-        public NetworkService Network { get; private set; }
-        public SessionModule Session { get; private set; }
+        public ISessionModule Session { get; private set; }
 
         protected override void CreateServices()
         {
             base.CreateServices();
 
-            if (string.IsNullOrWhiteSpace(_sessionScene))
-            {
-                return;
-            }
-
-            _identity = new LocalPlayerIdentity();
             var actions = InputActionsFactory.Create();
             try
             {
-                _input = _services.Own(new LocalInputService(actions));
+                _input = new LocalInputService(actions, Broadcaster);
             }
             finally
             {
                 Destroy(actions);
             }
 
-            Network = _services.Own(new NetworkService(new LobbyDirectory(),
-                new ReconnectStore(TimeSpan.FromMinutes(10)), _identity));
-            _windows = _services.Own(new WindowsService(Assets, _input));
-            if (_uiInput)
-            {
-                _services.Own(new UiInputBinding(_uiInput, _input));
-            }
+            _network = new NetworkService(new LobbyDirectory(Broadcaster),
+                CreateReconnectStore(), new LocalPlayerIdentity(), Broadcaster);
+            Broadcaster.Subscribe<NetworkSnapshot>(PublishNetworkSnapshotChanged);
         }
+
+        protected virtual ReconnectStore CreateReconnectStore() => new(TimeSpan.FromMinutes(10));
 
         protected override void DisposeServices()
         {
-            _services.Dispose();
-            base.DisposeServices();
+            Broadcaster.Unsubscribe<NetworkSnapshot>(PublishNetworkSnapshotChanged);
+            try
+            {
+                _network?.Dispose();
+            }
+            finally
+            {
+                _input?.Dispose();
+                base.DisposeServices();
+            }
         }
 
         protected override void CreateModules()
@@ -76,21 +56,31 @@ namespace Game.Bootstrap
             base.CreateModules();
 
             Modules.BindAsync<GameStarted, IGameStarted>((module, _) => module.OnGameStarted());
-            if (Network == null)
+            Modules.Bind<WindowChanged, IWindowChanged>((module, message) => module.OnWindowChanged(message.HasOpenWindow));
+            Modules.Bind<NetworkSnapshotChanged, INetworkSnapshotChanged>(
+                (module, message) => module.OnNetworkSnapshotChanged(message.Snapshot));
+
+            var session = Records.GetRecord<SessionRecord>();
+            if (string.IsNullOrWhiteSpace(session.ScenePath))
             {
                 return;
             }
 
-            var index = SceneUtility.GetBuildIndexByScenePath(_sessionScene);
-            if (index < 0 || !_loadingWindow || !_gameView)
+            var windows = Records.GetRecord<WindowsRecord>();
+            if (string.IsNullOrWhiteSpace(windows.LoadingWindowId))
             {
-                throw new InvalidOperationException("Configure a session build scene, a loading window and a game view");
+                throw new InvalidOperationException("Set the loading window asset ID in WindowsRecord");
             }
 
-            var target = string.IsNullOrWhiteSpace(_startupRoom) ? null : new SessionLocator(_startupRoom, _startupRegion);
-            Session = AddModule(new SessionModule(Network, _identity, _input, _windows, Assets,
-                SceneRef.FromIndex(index), _viewAnchor, _loadingWindow, _gameView, _pauseWindow, target,
-                _resumeOnStartup));
+            IWindowsModule windowsModule = new WindowsModule(Assets, _input, windows, Broadcaster);
+            var sessionModule = new SessionModule(_network, _input, Assets, windowsModule, session);
+            AddModule(windowsModule);
+            Session = AddModule(sessionModule);
+        }
+
+        private void PublishNetworkSnapshotChanged(NetworkSnapshot snapshot)
+        {
+            Broadcaster.Broadcast(new NetworkSnapshotChanged(snapshot));
         }
 
         protected override async UniTask StartGame()

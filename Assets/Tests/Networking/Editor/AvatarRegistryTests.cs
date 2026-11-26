@@ -1,4 +1,3 @@
-using Core.Resources;
 using System;
 using Core.Networking.Core;
 using NUnit.Framework;

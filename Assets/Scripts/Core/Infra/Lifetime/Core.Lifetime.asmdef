@@ -1,10 +1,7 @@
 {
     "name": "Core.Lifetime",
     "rootNamespace": "Core.Lifetime",
-    "references": [
-        "UniTask",
-        "Core.Resources"
-    ],
+    "references": [],
     "noEngineReferences": false,
     "autoReferenced": true
 }

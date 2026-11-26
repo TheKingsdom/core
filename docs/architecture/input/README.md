@@ -6,7 +6,7 @@ Responsibility: [Coop sessions](../coop-sessions.md).
 
 ## Purpose
 
-Input has no network or UI dependency. It owns a copy of the action asset. Player leases prevent stale bindings from clearing current bindings. Context changes clear pending presses and require held action buttons to release. Device detection selects keyboard or gamepad hints. [Text input](textinput.md) defines platform providers.
+Input has no network or UI dependency. It owns a copy of the action asset. The owner binds and unbinds the local avatar explicitly. Context changes clear pending presses and require held action buttons to release. Device detection selects keyboard or gamepad hints. [Text input](textinput.md) defines platform providers.
 
 ## Action contract
 
@@ -17,9 +17,9 @@ The session module gathers movement input and handles pause. The other actions r
 
 ## Player and window changes
 
-`BindPlayer` returns a versioned lease and starts with gameplay blocked.
+`BindPlayer` selects the avatar and starts with gameplay blocked.
 Call `SetGameplayBlocked` with the same player object to enable or block gameplay.
-Disposing an old player lease does not unbind a replacement player.
+`UnbindPlayer` clears the binding only if its avatar matches the active binding.
 
 `Move` and `GetLookDelta` respect the gameplay gate.
 `ConsumePress` removes a queued gameplay press. `WasPressed` reads the current frame action state through its context gate.

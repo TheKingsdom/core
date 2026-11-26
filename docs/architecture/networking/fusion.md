@@ -2,7 +2,7 @@
 
 Source folder: `Assets/Scripts/Core/Networking/Fusion`.
 
-Files: NetworkService.cs, NetworkService.Operations.cs, FusionRunnerSession.cs, FusionSceneManager.cs, NetworkSceneLoader.cs, LobbyDirectory.cs, ReconnectStore.cs, LocalPlayerIdentity.cs, NetworkSnapshot.cs, NetworkEvent.cs, NetworkInputData.cs, IPlayerInputSource.cs, IRunnerScopeInstaller.cs, SharedAuthorityLease.cs, NetworkDisposableBehaviour.cs, NetworkServiceLink.cs, NetworkExtensions.cs, SessionData.cs, ConnectionState.cs.
+Files: NetworkService.cs, NetworkService.Operations.cs, FusionRunnerSession.cs, FusionSceneManager.cs, NetworkSceneLoader.cs, LobbyDirectory.cs, ReconnectStore.cs, LocalPlayerIdentity.cs, NetworkSnapshot.cs, NetworkEvent.cs, NetworkInputData.cs, IPlayerInputSource.cs, IRunnerScopeInstaller.cs, NetworkServiceLink.cs, NetworkExtensions.cs, SessionData.cs, ConnectionState.cs.
 
 Responsibility: [Coop sessions](../coop-sessions.md).
 
@@ -13,7 +13,7 @@ Responsibility: [Coop sessions](../coop-sessions.md).
 ## Composition contract
 
 Construct the service with the directory, reconnect store, and identity. Configure the installer in the session module before the first network command.
-The runner owns the lease returned by `IRunnerScopeInstaller.Install`.
+`IRunnerScopeInstaller.Install` creates the player context. `Release` clears the context after runner shutdown.
 `PrepareRoomAsync` must complete before the service publishes `InRoom`.
 `PrepareLeaveAsync` releases local player resources before runner shutdown.
 
@@ -35,7 +35,7 @@ Do not call Fusion runner shutdown directly from game menus. Use the service so 
 ## State and cleanup
 
 `Snapshot` contains the current phase, generation, session locator, local peer, owner flag, and peer roster.
-`Broadcaster` publishes each `NetworkSnapshot`, each `NetworkEvent` for phase, participant, and owner changes, `NetworkDisconnected`, and `NetworkConnectionFailed`. `ConnectionState`, `RoomPlayers`, and `IsSessionOwner` give the latest values.
+The broadcaster passed to the constructor receives each `NetworkSnapshot`, each `NetworkEvent` for phase, participant, and owner changes, `NetworkDisconnected`, and `NetworkConnectionFailed`. `ConnectionState`, `RoomPlayers`, and `IsSessionOwner` give the latest values.
 `Directory.Sessions` contains the current lobby room list.
 
 The service retires a generation before it shuts down the runner. Callbacks from a retired runner have no effect.

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using Core.Networking.Core;
+using Core.Infra.Messaging;
 using Cysharp.Threading.Tasks;
 using Fusion;
 using Fusion.Photon.Realtime;
@@ -22,11 +23,13 @@ namespace Core.Networking.Fusion
         public NetworkSnapshot Snapshot { get; private set; } = new(default, ConnectionPhase.Disconnected);
         public RunnerGeneration Generation => _epochs.Generation;
 
-        public NetworkService(LobbyDirectory directory, ReconnectStore reconnect, LocalPlayerIdentity identity)
+        public NetworkService(LobbyDirectory directory, ReconnectStore reconnect, LocalPlayerIdentity identity,
+            IBroadcaster broadcaster = null)
         {
             Directory = directory ?? throw new ArgumentNullException(nameof(directory));
             Reconnect = reconnect ?? throw new ArgumentNullException(nameof(reconnect));
             _identity = identity ?? throw new ArgumentNullException(nameof(identity));
+            _broadcaster = broadcaster ?? new Broadcaster();
             _applicationExit = UnityEngine.Application.exitCancellationToken;
             Reconnect.Restore();
         }
@@ -218,7 +221,7 @@ namespace Core.Networking.Fusion
                 context.Stage = NetworkErrorStage.Admission;
                 try
                 {
-                    await scope.PrepareRoomAsync(_scopeInstaller, create, context.CancellationToken);
+                    await scope.PrepareRoomAsync(create, context.CancellationToken);
                 }
                 catch (TimeoutException error)
                 {
@@ -253,9 +256,9 @@ namespace Core.Networking.Fusion
 
             var result = await WithCleanupAsync(context, async () =>
             {
-                if (_scopeInstaller != null)
+                if (_session != null)
                 {
-                    await _scopeInstaller.PrepareLeaveAsync(_runner, Generation);
+                    await _session.PrepareLeaveAsync();
                 }
 
                 PublishPhase(ConnectionPhase.Disconnecting);
@@ -317,7 +320,7 @@ namespace Core.Networking.Fusion
             if (ShouldPublishConnectionError(result))
             {
                 var value = new NetworkOperationException(result).Message;
-                Broadcaster.Broadcast(new NetworkConnectionFailed(value));
+                _broadcaster.Broadcast(new NetworkConnectionFailed(value));
             }
 
             return result;
@@ -336,15 +339,15 @@ namespace Core.Networking.Fusion
                 throw new InvalidOperationException("Runner cleanup required before creation");
             }
             var runnerGeneration = new RunnerGeneration(checked(_epochs.Generation.Value + 1));
-            var scope = new FusionRunnerSession(this, runnerGeneration);
-            _session = scope;
-            context.Generation = _epochs.Activate(scope.Runner);
             if (_scopeInstaller == null)
             {
                 throw new InvalidOperationException("Runner scope installer is missing");
             }
-            var resource = _scopeInstaller.Install(scope.Runner, scope.Generation);
-            scope.Own(resource);
+
+            var scope = new FusionRunnerSession(this, runnerGeneration, _scopeInstaller);
+            _session = scope;
+            context.Generation = _epochs.Activate(scope.Runner);
+            scope.Install();
             scope.ActivateCallbacks();
             Directory.Reset(scope.Generation);
             PublishPhase(Snapshot.Phase);
@@ -432,7 +435,7 @@ namespace Core.Networking.Fusion
             var previous = Snapshot;
             var operationId = Operations.ActiveOperationId;
             Snapshot = snapshot;
-            Broadcaster.Broadcast(snapshot);
+            _broadcaster.Broadcast(snapshot);
             if (!ReferenceEquals(Snapshot, snapshot))
             {
                 return;
@@ -472,7 +475,7 @@ namespace Core.Networking.Fusion
                     return;
                 }
                 var networkEvent = new NetworkEvent(kind, snapshot, operationId, player);
-                Broadcaster.Broadcast(networkEvent);
+                _broadcaster.Broadcast(networkEvent);
             }
         }
 

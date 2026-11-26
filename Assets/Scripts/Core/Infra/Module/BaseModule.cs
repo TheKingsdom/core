@@ -4,7 +4,8 @@ namespace Core.Infra.Module
 {
     public abstract class BaseModule : IModule, IInternalModule
     {
-        public IBroadcaster Broadcaster { get; } = new Broadcaster();
+        protected IBroadcaster Broadcaster { get; } = new Broadcaster();
+        IBroadcaster IInternalModule.Broadcaster => Broadcaster;
 
         public abstract void Dispose();
 

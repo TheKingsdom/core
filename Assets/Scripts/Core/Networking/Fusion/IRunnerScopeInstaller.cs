@@ -1,16 +1,16 @@
-using Core.Resources;
-using System;
+using System.Threading;
 using Core.Networking.Core;
+using Cysharp.Threading.Tasks;
 using Fusion;
 
 namespace Core.Networking.Fusion
 {
     public interface IRunnerScopeInstaller
     {
-        IDisposable Install(NetworkRunner runner, RunnerGeneration generation);
-        Cysharp.Threading.Tasks.UniTask PrepareLeaveAsync(NetworkRunner runner, RunnerGeneration generation);
-
-        Cysharp.Threading.Tasks.UniTask PrepareRoomAsync(NetworkRunner runner, RunnerGeneration generation,
-            CreateSessionRequest creation, System.Threading.CancellationToken cancellationToken);
+        void Install(NetworkRunner runner, RunnerGeneration generation);
+        UniTask PrepareRoomAsync(NetworkRunner runner, RunnerGeneration generation, CreateSessionRequest creation,
+            CancellationToken cancellationToken);
+        UniTask PrepareLeaveAsync(NetworkRunner runner, RunnerGeneration generation);
+        void Release(NetworkRunner runner, RunnerGeneration generation);
     }
 }

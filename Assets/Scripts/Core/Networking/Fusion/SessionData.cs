@@ -1,4 +1,3 @@
-using Core.Resources;
 namespace Core.Networking.Fusion
 {
     public sealed class SessionData

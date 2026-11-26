@@ -38,7 +38,7 @@ namespace Core.Networking.Fusion
         private long _nextId;
         private bool _disposed;
         public SceneLoadSnapshot State { get; private set; }
-        public IBroadcaster Broadcaster { get; } = new Broadcaster();
+        private readonly IBroadcaster _broadcaster;
 
         private sealed class Attempt
         {
@@ -49,14 +49,15 @@ namespace Core.Networking.Fusion
             public Attempt(SceneRegistrationOperation<SceneRef> operation) => Operation = operation;
         }
 
-        internal NetworkSceneLoader(NetworkRunner runner, FusionSceneManager manager, RunnerGeneration generation)
+        internal NetworkSceneLoader(NetworkRunner runner, FusionSceneManager manager, RunnerGeneration generation, IBroadcaster broadcaster)
         {
             _runner = runner;
             _manager = manager;
             _generation = generation;
-            manager.Broadcaster.Subscribe<SceneProgress>(ObserveProgress);
-            manager.Broadcaster.Subscribe<SceneRegistration>(ObserveRegistration);
-            manager.Broadcaster.Subscribe<SceneLoadFailure>(ObserveFailure);
+            _broadcaster = broadcaster;
+            _broadcaster.Subscribe<SceneProgress>(ObserveProgress);
+            _broadcaster.Subscribe<SceneRegistration>(ObserveRegistration);
+            _broadcaster.Subscribe<SceneLoadFailure>(ObserveFailure);
         }
 
         private void ObserveProgress(SceneProgress progress)
@@ -212,7 +213,7 @@ namespace Core.Networking.Fusion
             if (CanPublishAttempt(attempt))
             {
                 State = new SceneLoadSnapshot(attempt.Operation);
-                Broadcaster.Broadcast(State);
+                _broadcaster.Broadcast(State);
             }
         }
 
@@ -225,9 +226,9 @@ namespace Core.Networking.Fusion
 
             _disposed = true;
             _lifetime.Cancel();
-            _manager.Broadcaster.Unsubscribe<SceneProgress>(ObserveProgress);
-            _manager.Broadcaster.Unsubscribe<SceneRegistration>(ObserveRegistration);
-            _manager.Broadcaster.Unsubscribe<SceneLoadFailure>(ObserveFailure);
+            _broadcaster.Unsubscribe<SceneProgress>(ObserveProgress);
+            _broadcaster.Unsubscribe<SceneRegistration>(ObserveRegistration);
+            _broadcaster.Unsubscribe<SceneLoadFailure>(ObserveFailure);
             _lifetime.Dispose();
         }
 

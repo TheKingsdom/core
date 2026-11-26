@@ -6,4 +6,4 @@ Responsibility: [Coop sessions](../../coop-sessions.md).
 
 ## Purpose
 
-The editor provider registers with active window services during Play Mode. Its utility window supports Unicode text, keyboard confirmation, and cancellation. Provider registration releases when Play Mode ends.
+The editor registers a provider factory for `TextInputService`. Each window module owns its text input service during Play Mode. Its utility window supports Unicode text, keyboard confirmation, and cancellation. Provider registration releases when Play Mode ends.

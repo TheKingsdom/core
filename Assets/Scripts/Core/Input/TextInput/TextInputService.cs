@@ -10,7 +10,24 @@ namespace Core.Input.TextInput
         private Session _active;
         private bool _disposed;
 
-        public IBroadcaster Broadcaster { get; } = new Broadcaster();
+        private readonly IBroadcaster _broadcaster;
+
+#if UNITY_EDITOR
+        public static Func<ITextInputProvider> EditorProviderFactory { private get; set; }
+#endif
+
+        public TextInputService(IBroadcaster broadcaster = null)
+        {
+            _broadcaster = broadcaster ?? new Broadcaster();
+#if UNITY_EDITOR
+            var editorProvider = EditorProviderFactory?.Invoke();
+            if (editorProvider != null)
+            {
+                Register(editorProvider, -1000);
+            }
+#endif
+        }
+
         public bool IsOpen => _active != null;
 
         public IDisposable Register(ITextInputProvider provider, int priority = 0)
@@ -39,7 +56,7 @@ namespace Core.Input.TextInput
                     if (!registration.Provider.IsAvailable(request)) continue;
                     session = new Session(this, registration, request, completed);
                     _active = session;
-                    Broadcaster.Broadcast(new TextInputSessionChanged(IsOpen));
+                    _broadcaster.Broadcast(new TextInputSessionChanged(IsOpen));
                     if (session.Finished) return session;
                     var lease = registration.Provider.Open(request, session.Complete);
                     session.Attach(lease);
@@ -47,7 +64,7 @@ namespace Core.Input.TextInput
                 }
                 catch (Exception error)
                 {
-                    Broadcaster.Broadcast(new TextInputProviderFailed(error));
+                    _broadcaster.Broadcast(new TextInputProviderFailed(error));
                     if (session != null && session.Finished) return session;
                 }
 
@@ -74,7 +91,7 @@ namespace Core.Input.TextInput
         {
             if (!ReferenceEquals(_active, session)) return;
             _active = null;
-            Broadcaster.Broadcast(new TextInputSessionChanged(IsOpen));
+            _broadcaster.Broadcast(new TextInputSessionChanged(IsOpen));
         }
 
         private sealed class Registration : IDisposable
@@ -146,7 +163,7 @@ namespace Core.Input.TextInput
                 }
                 catch (Exception error)
                 {
-                    _owner.Broadcaster.Broadcast(new TextInputProviderFailed(error));
+                    _owner._broadcaster.Broadcast(new TextInputProviderFailed(error));
                 }
                 finally
                 {

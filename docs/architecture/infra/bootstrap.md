@@ -48,7 +48,8 @@ A subclass can change these `protected virtual` methods:
 
 | Member | Purpose |
 |--------|---------|
-| `Broadcaster` | Public property. The client event bus. Refer to [messaging](messaging.md). |
+| `CreateAssetService()` | Creates the asset service. Override this method to select another implementation. |
+| `Broadcaster` | Protected property. The client event bus. Refer to [messaging](messaging.md). |
 | `Modules` | Protected property. The `ModuleScope`. A subclass calls `Bind` and `BindAsync` on it to register hooks. Refer to [module](module.md#hooks). |
 | `Assets` | Protected property. The `IAssetService`. |
 | `Records` | Protected property. The `IRecordService`. |

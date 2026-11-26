@@ -6,9 +6,9 @@ Run the project EditMode tests with Unity Test Runner. Select the project test a
 |----------|----------|
 | `Core.Input.Tests` | Input routing, action gates, and text input |
 | `Core.UI.Tests` | Window navigation and pointer behavior |
-| `Core.Networking.Tests` | Operation gate, runner retirement, scene registration, shutdown, spawning, roster, and leases |
-| `Core.Integration.Tests` | Local room entry, ready game view, loading cancellation, failure and retry, window reopening, input reference release, and two-peer reconnect |
+| `Core.Networking.Tests` | Operation gate, runner retirement, scene registration, shutdown, spawning, and roster |
+| `Core.Integration.Tests` | Local room entry, ready game view, loading cancellation, failure and retry, asset release, window reopening, input reference release, two-peer reconnect, and lobby recovery |
 
-The `PhotonOnline` case first checks `CORE_PHOTON_APP_ID`. If that value is empty, it checks the local `Core.PhotonAppId` preference and then `PhotonAppSettings`. The test skips when none is configured. It uses a unique Shared room and checks that the returning player keeps the same avatar after reconnect.
+The `PhotonOnline` cases first check `CORE_PHOTON_APP_ID`. If that value is empty, it checks the local `Core.PhotonAppId` preference and then `PhotonAppSettings`. The tests skip when none is configured. They use a unique Shared room for avatar reconnect and also check recovery after a lobby runner stops. The fixtures use reconnect state in memory.
 
 The test scene and prefab are in `Assets/Tests/Integration/Fixtures`. The tests temporarily register the avatar prefab in Fusion and restore the global configuration on exit.

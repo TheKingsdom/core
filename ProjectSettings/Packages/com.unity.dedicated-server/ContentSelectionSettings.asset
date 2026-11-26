@@ -10,7 +10,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 15026, guid: 0000000000000000e000000000000000, type: 0}
-  m_Name: 
+  m_Name:
   m_EditorClassIdentifier: UnityEditor.MultiplayerModule.dll::Unity.Multiplayer.Editor.ContentSelectionSettings
   m_EnableSafetyChecks: 1
   m_AutomaticSelectionOptions:
@@ -19,4 +19,4 @@ MonoBehaviour:
     m_StripAudioComponents: 0
     m_CustomComponentsList:
       m_Keys: []
-      m_Values: 
+      m_Values:

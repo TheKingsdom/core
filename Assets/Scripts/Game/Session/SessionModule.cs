@@ -1,80 +1,101 @@
 using System;
 using System.Threading;
+using System.Threading.Tasks;
 using Core.Infra.Module;
 using Core.Input;
 using Core.Networking.Core;
 using Core.Networking.Fusion;
 using Core.Networking.Players;
-using Core.Resources;
 using Core.Services.Asset;
-using Core.UI.Windows;
 using Cysharp.Threading.Tasks;
 using Fusion;
 using Game.Bootstrap;
+using Game.Windows;
 using UnityEngine;
-using Object = UnityEngine.Object;
+using UnityEngine.SceneManagement;
 
 namespace Game.Session
 {
-    public sealed class SessionModule : BaseModule, IGameStarted, IPlayerInputSource
+    public sealed class SessionModule : BaseModule, ISessionModule, ISessionModuleInternal, IGameStarted,
+        IWindowChanged, INetworkSnapshotChanged, IPlayerInputSource
     {
         private readonly NetworkService _network;
-        private readonly PlayerSessionCoordinator _players;
         private readonly LocalInputService _input;
-        private readonly WindowsService _windows;
         private readonly IAssetService _assets;
-        private readonly SceneRef _scene;
-        private readonly Transform _anchor;
-        private readonly LoadingWindow _loadingWindow;
-        private readonly PauseWindow _pauseWindow;
-        private readonly GameSessionView _gameViewPrefab;
-        private readonly SessionLocator _startupTarget;
-        private readonly bool _resumeOnStartup;
-        private readonly Func<PlayerAvatar, CancellationToken, UniTask<IDisposable>> _initializePlayer;
+        private readonly IWindowsModule _windows;
+        private readonly SessionRecord _record;
         private readonly CancellationTokenSource _lifetime = new();
+        private readonly SceneRef _scene;
+        private PlayerSessionCoordinator _players;
         private CancellationTokenSource _operation;
-        private GameSessionView _gameView;
+        private IInstance<GameSessionView> _gameView;
+        private PlayerAvatar _inputPlayer;
+        private NetworkRunner _inputRunner;
         private bool _disposed;
 
-        public GameSessionView GameView => _gameView;
+        private GameSessionView GameView => _gameView?.Value;
 
-        public SessionModule(NetworkService network, LocalPlayerIdentity identity, LocalInputService input,
-            WindowsService windows, IAssetService assets, SceneRef scene, Transform anchor,
-            LoadingWindow loadingWindow, GameSessionView gameView, PauseWindow pauseWindow = null,
-            SessionLocator startupTarget = null, bool resumeOnStartup = false,
-            Func<PlayerAvatar, CancellationToken, UniTask<IDisposable>> initializePlayer = null)
+        public SessionModule(NetworkService network, LocalInputService input, IAssetService assets, IWindowsModule windows,
+            SessionRecord record)
         {
             _network = network;
             _input = input;
-            _windows = windows;
             _assets = assets;
-            _scene = scene;
-            _anchor = anchor;
-            _loadingWindow = loadingWindow;
-            _gameViewPrefab = gameView;
-            _pauseWindow = pauseWindow;
-            _startupTarget = startupTarget;
-            _resumeOnStartup = resumeOnStartup;
-            _players = new PlayerSessionCoordinator(network, identity, scene, BindLocalPlayerAsync);
-            _initializePlayer = initializePlayer;
+            _windows = windows;
+            _record = record;
+
+            var index = SceneUtility.GetBuildIndexByScenePath(record.ScenePath);
+            if (index < 0 || string.IsNullOrWhiteSpace(record.GameViewId))
+            {
+                throw new InvalidOperationException("Set a session build scene and a game view asset ID in SessionRecord");
+            }
+
+            _scene = SceneRef.FromIndex(index);
         }
 
         public override void Start()
         {
+            _players = new PlayerSessionCoordinator(_network, _scene, BindLocalPlayerAsync, UnbindLocalPlayer,
+                broadcaster: Broadcaster);
             _network.InitialScene = _scene;
             _network.Configure(_players);
-            _network.Broadcaster.Subscribe<NetworkSnapshot>(OnNetworkSnapshot);
-            _windows.Broadcaster.Subscribe<CurrentWindowChanged>(OnWindowChanged);
-            HandleInputAsync(_lifetime.Token).SuppressCancellationThrow().Forget(Debug.LogException);
+            HandlePauseAsync(_lifetime.Token).SuppressCancellationThrow().Forget(Debug.LogException);
         }
 
-        public async UniTask OnGameStarted()
+        public override void Dispose()
         {
-            if (_startupTarget != null)
+            if (_disposed)
             {
-                await JoinAsync(_startupTarget);
+                return;
             }
-            else if (_resumeOnStartup && _network.Reconnect.Current?.IsComplete == true)
+
+            _disposed = true;
+            try
+            {
+                _lifetime.Cancel();
+            }
+            finally
+            {
+                try
+                {
+                    UnbindLocalPlayer(_inputPlayer);
+                    ReleaseGameView();
+                }
+                finally
+                {
+                    _network.LeaveSessionAsync(LeaveMode.KeepReconnect).Forget(Debug.LogException);
+                    _lifetime.Dispose();
+                }
+            }
+        }
+
+        async UniTask IGameStarted.OnGameStarted()
+        {
+            if (!string.IsNullOrWhiteSpace(_record.StartupRoom))
+            {
+                await JoinAsync(new SessionLocator(_record.StartupRoom, _record.StartupRegion));
+            }
+            else if (_record.ResumeOnStartup && _network.Reconnect.Current?.IsComplete == true)
             {
                 await ReconnectAsync();
             }
@@ -112,66 +133,67 @@ namespace Game.Session
 
         public async UniTask<OperationResult> LeaveAsync(LeaveMode mode = LeaveMode.ForgetSession)
         {
+            await UniTask.SwitchToMainThread();
             if (_disposed)
             {
                 return AdmissionResult(OperationStatus.Rejected, NetworkErrorCode.Disposed, "Session module disposed");
             }
 
-            _operation?.Cancel();
             try
             {
+                _operation?.Cancel();
                 ReleaseGameView();
-                _windows.CloseViews(this);
             }
             catch (Exception error)
             {
                 Debug.LogException(error);
             }
+
+            try
+            {
+                _windows.ClosePause();
+            }
+            catch (Exception error)
+            {
+                Debug.LogException(error);
+            }
+
             return await _network.LeaveSessionAsync(mode);
         }
 
-        public bool TryCollect(out NetworkInputData data)
+        bool IPlayerInputSource.TryCollect(out NetworkInputData data)
         {
             data = new NetworkInputData
             {
                 MoveInput = _input.Move,
                 Paused = !_input.GameplayEnabled
             };
-            return _players.Current && _players.Current.Bootstrap.LocalPlayer;
+            return _inputPlayer;
         }
 
-        public override void Dispose()
-        {
-            if (_disposed)
-            {
-                return;
-            }
+        void IWindowChanged.OnWindowChanged(bool hasOpenWindow) => UpdateGameplayGate(hasOpenWindow);
 
-            _disposed = true;
-            _network.Broadcaster.Unsubscribe<NetworkSnapshot>(OnNetworkSnapshot);
-            _windows.Broadcaster.Unsubscribe<CurrentWindowChanged>(OnWindowChanged);
-            try
+        void INetworkSnapshotChanged.OnNetworkSnapshotChanged(NetworkSnapshot snapshot)
+        {
+            if (snapshot.Phase != ConnectionPhase.InRoom && GameView)
             {
-                _lifetime.Cancel();
                 try
                 {
                     ReleaseGameView();
                 }
                 finally
                 {
-                    _windows.ReleaseViews(this);
+                    _windows.ClosePause();
                 }
             }
-            finally
-            {
-                _network.LeaveSessionAsync(LeaveMode.KeepReconnect).Forget(Debug.LogException);
-                _lifetime.Dispose();
-            }
+
+            Broadcaster.Broadcast(snapshot);
         }
 
         private async UniTask<OperationResult> EnterAsync(
             Func<CancellationToken, UniTask<OperationResult>> operation, CancellationToken token)
         {
+            await UniTask.SwitchToMainThread();
             if (_disposed || _operation != null)
             {
                 return _disposed
@@ -181,42 +203,41 @@ namespace Game.Session
 
             using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(_lifetime.Token, token);
             _operation = cancellation;
-            var enteredRoom = false;
-            WindowBase loading = null;
+            RunnerGeneration? enteredGeneration = null;
+            var loadingOpened = false;
             try
             {
-                if (cancellation.IsCancellationRequested)
-                {
-                    return AdmissionResult(OperationStatus.Cancelled);
-                }
-
-                loading = _windows.Open(this, _loadingWindow, _anchor, cancellation.Cancel);
+                cancellation.Token.ThrowIfCancellationRequested();
+                await _windows.OpenLoadingAsync(cancellation.Cancel, cancellation.Token);
+                loadingOpened = true;
                 var result = await operation(cancellation.Token);
-                enteredRoom = result.IsSuccess;
-                if (!enteredRoom)
+                if (!result.IsSuccess)
                 {
                     return result;
                 }
 
-                cancellation.Token.ThrowIfCancellationRequested();
-                ShowGameView();
-                cancellation.Token.ThrowIfCancellationRequested();
+                enteredGeneration = result.Generation;
+                await ShowGameViewAsync(result.Generation, cancellation.Token);
                 return result;
             }
             catch (OperationCanceledException)
             {
-                if (enteredRoom)
+                await UniTask.SwitchToMainThread();
+                if (enteredGeneration is { } generation)
                 {
-                    await LeaveAfterFailedEntryAsync();
+                    await LeaveAfterFailedEntryAsync(generation);
                 }
+
                 return AdmissionResult(OperationStatus.Cancelled);
             }
             catch (Exception error)
             {
-                if (enteredRoom)
+                await UniTask.SwitchToMainThread();
+                if (enteredGeneration is { } generation)
                 {
-                    await LeaveAfterFailedEntryAsync();
+                    await LeaveAfterFailedEntryAsync(generation);
                 }
+
                 Debug.LogException(error);
                 return AdmissionResult(OperationStatus.Failed, NetworkErrorCode.Unexpected, error.Message);
             }
@@ -224,9 +245,9 @@ namespace Game.Session
             {
                 try
                 {
-                    if (loading && !_disposed)
+                    if (loadingOpened && !_disposed)
                     {
-                        _windows.Close(loading);
+                        _windows.CloseLoading();
                     }
                 }
                 catch (Exception error)
@@ -240,7 +261,7 @@ namespace Game.Session
             }
         }
 
-        private async UniTask LeaveAfterFailedEntryAsync()
+        private async UniTask LeaveAfterFailedEntryAsync(RunnerGeneration generation)
         {
             try
             {
@@ -252,109 +273,162 @@ namespace Game.Session
             }
             finally
             {
-                await _network.LeaveSessionAsync(LeaveMode.KeepReconnect);
+                if (_network.Generation == generation)
+                {
+                    await _network.LeaveSessionAsync(LeaveMode.KeepReconnect);
+                }
             }
         }
 
-        private void ShowGameView()
+        private async UniTask ShowGameViewAsync(RunnerGeneration generation, CancellationToken token)
         {
+            token.ThrowIfCancellationRequested();
+            ReleaseGameView();
+            var id = _record.GameViewId;
+            var pending = _assets.Instantiate<GameSessionView>(id).AsTask();
+            GameSessionView view;
+            try
+            {
+                view = await pending.AsUniTask().AttachExternalCancellation(token);
+            }
+            catch (OperationCanceledException) when (token.IsCancellationRequested)
+            {
+                DestroyPendingGameViewAsync(pending, id).SuppressCancellationThrow().Forget(Debug.LogException);
+                throw;
+            }
+
+            await UniTask.SwitchToMainThread();
+            _gameView = new DefaultInstance<GameSessionView>(id, view);
+            token.ThrowIfCancellationRequested();
+
             var player = _players.Current ? _players.Current.Bootstrap.LocalPlayer : null;
             if (!player || !player.IsReady || _network.Snapshot.Phase != ConnectionPhase.InRoom ||
+                _network.Snapshot.Generation != generation ||
                 !_network.SceneLoader.TryGetRegistration(_scene, out var registration))
             {
                 throw new InvalidOperationException("The local player or the session scene is unavailable");
             }
 
-            ReleaseGameView();
-            _gameView = Object.Instantiate(_gameViewPrefab, _anchor);
-            _gameView.Data = new SessionViewData(registration.Scene, player, _network.Snapshot);
-            _gameView.Init(this, _assets);
-            _gameView.gameObject.SetActive(true);
-            UpdateGameplayGate();
+            view.Inject(new SessionViewData(registration.Scene, player, _network.Snapshot));
+            view.Init(this, _assets);
+            token.ThrowIfCancellationRequested();
+            if (!ReferenceEquals(GameView, view))
+            {
+                throw new InvalidOperationException("The session ended while the game view was initializing");
+            }
+
+            view.gameObject.SetActive(true);
+            token.ThrowIfCancellationRequested();
+            UpdateGameplayGate(_windows.HasOpenWindow);
+        }
+
+        private async UniTask DestroyPendingGameViewAsync(Task<GameSessionView> pending, string id)
+        {
+            var view = await pending.AsUniTask();
+            await UniTask.SwitchToMainThread();
+            _assets.Destroy(new DefaultInstance<GameSessionView>(id, view));
         }
 
         private void ReleaseGameView()
         {
-            var gameView = _gameView;
+            var instance = _gameView;
             _gameView = null;
-            if (gameView)
+            if (instance == null)
+            {
+                return;
+            }
+
+            try
+            {
+                if (instance.Value)
+                {
+                    instance.Value.Dispose();
+                }
+            }
+            finally
             {
                 try
                 {
-                    gameView.Dispose();
+                    if (instance.Value)
+                    {
+                        instance.Value.gameObject.SetActive(false);
+                    }
+
+                    _assets.Destroy(instance);
                 }
                 finally
                 {
-                    gameView.Data = null;
-                    gameView.gameObject.SetActive(false);
-                    Object.Destroy(gameView.gameObject);
-                    UpdateGameplayGate();
+                    UpdateGameplayGate(_windows.HasOpenWindow);
                 }
             }
         }
 
-        private async UniTask<IDisposable> BindLocalPlayerAsync(PlayerAvatar avatar, CancellationToken token)
+        private UniTask BindLocalPlayerAsync(PlayerAvatar avatar, CancellationToken token)
         {
             token.ThrowIfCancellationRequested();
-            var scope = new ResourceScope();
+            var runner = avatar.Runner;
+            _input.BindPlayer(avatar);
             try
             {
-                scope.Own(_input.BindPlayer(avatar));
-                scope.Own(_network.RegisterInputSource(avatar.Runner, this));
-                if (_initializePlayer != null)
-                {
-                    scope.Own(await _initializePlayer(avatar, token));
-                }
-                token.ThrowIfCancellationRequested();
-                return scope;
+                _network.RegisterInputSource(runner, this);
+                _inputPlayer = avatar;
+                _inputRunner = runner;
+                return UniTask.CompletedTask;
             }
             catch
             {
-                scope.Dispose();
+                _input.UnbindPlayer(avatar);
                 throw;
             }
         }
 
-        private async UniTask HandleInputAsync(CancellationToken token)
+        private void UnbindLocalPlayer(PlayerAvatar avatar)
+        {
+            if (ReferenceEquals(avatar, null) || !ReferenceEquals(_inputPlayer, avatar))
+            {
+                return;
+            }
+
+            var runner = _inputRunner;
+            _inputPlayer = null;
+            _inputRunner = null;
+            try
+            {
+                _network.UnregisterInputSource(runner, this);
+            }
+            finally
+            {
+                _input.UnbindPlayer(avatar);
+            }
+        }
+
+        private async UniTask HandlePauseAsync(CancellationToken token)
         {
             while (true)
             {
                 await UniTask.NextFrame(cancellationToken: token);
-                if (_pauseWindow && _gameView && !_windows.CurrentWindow && _input.WasPressed(GameInputAction.Pause))
+                if (GameView && !_windows.HasOpenWindow && _input.WasPressed(GameInputAction.Pause))
                 {
-                    var model = new PauseWindow.Model(
-                        () => LeaveAsync().Forget(Debug.LogException),
-                        () => LeaveAsync(LeaveMode.KeepReconnect).Forget(Debug.LogException));
-                    _windows.Open(this, _pauseWindow, _anchor, model, isDisplacing: false);
-                }
-                else
-                {
-                    _windows.HandleCancel();
+                    try
+                    {
+                        await _windows.OpenPauseAsync(
+                            () => LeaveAsync().Forget(Debug.LogException),
+                            () => LeaveAsync(LeaveMode.KeepReconnect).Forget(Debug.LogException),
+                            token);
+                    }
+                    catch (Exception error) when (error is not OperationCanceledException)
+                    {
+                        Debug.LogException(error);
+                    }
                 }
             }
         }
 
-        private void OnWindowChanged(CurrentWindowChanged _) => UpdateGameplayGate();
-
-        private void OnNetworkSnapshot(NetworkSnapshot snapshot)
+        private void UpdateGameplayGate(bool hasOpenWindow)
         {
-            if (snapshot.Phase != ConnectionPhase.InRoom && _gameView)
+            if (_inputPlayer)
             {
-                ReleaseGameView();
-                if (_windows.CurrentWindow is PauseWindow)
-                {
-                    _windows.CloseViews(this);
-                }
-            }
-            Broadcaster.Broadcast(snapshot);
-        }
-
-        private void UpdateGameplayGate()
-        {
-            var player = _players.Current ? _players.Current.Bootstrap.LocalPlayer : null;
-            if (player)
-            {
-                _input.SetGameplayBlocked(player, !_gameView || _windows.CurrentWindow);
+                _input.SetGameplayBlocked(_inputPlayer, !GameView || hasOpenWindow);
             }
         }
 

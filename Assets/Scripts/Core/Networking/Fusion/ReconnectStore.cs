@@ -1,4 +1,3 @@
-using Core.Resources;
 using System;
 using Core.Networking.Core;
 using UnityEngine;
@@ -12,9 +11,14 @@ namespace Core.Networking.Fusion
         private const string SavedSessionRegionKey = "Core_SavedSessionRegion";
         private const string SavedSessionVersionKey = "Core_SavedSessionVersion";
         private readonly TimeSpan _savedSessionTimeToLive;
+        private readonly bool _persistAcrossLaunches;
         private bool _remember = true;
         public SessionLocator Current { get; private set; }
-        public ReconnectStore(TimeSpan timeToLive) => _savedSessionTimeToLive = timeToLive;
+        public ReconnectStore(TimeSpan timeToLive, bool persistAcrossLaunches = true)
+        {
+            _savedSessionTimeToLive = timeToLive;
+            _persistAcrossLaunches = persistAcrossLaunches;
+        }
 
         internal void Restore()
         {
@@ -51,7 +55,7 @@ namespace Core.Networking.Fusion
         {
             get
             {
-                var savedSessionName = PlayerPrefs.GetString(SavedSessionNameKey, null);
+                var savedSessionName = SavedSessionName;
                 if (string.IsNullOrWhiteSpace(savedSessionName))
                 {
                     return false;
@@ -85,7 +89,7 @@ namespace Core.Networking.Fusion
             }
         }
 
-        public string SavedSessionName => PlayerPrefs.GetString(SavedSessionNameKey, null);
+        public string SavedSessionName => _persistAcrossLaunches ? PlayerPrefs.GetString(SavedSessionNameKey, null) : null;
 
         private SessionLocator SavedSession
         {
@@ -99,7 +103,7 @@ namespace Core.Networking.Fusion
 
         private void SaveSession(SessionLocator session)
         {
-            if (!session.IsComplete)
+            if (!_persistAcrossLaunches || !session.IsComplete)
             {
                 return;
             }
@@ -114,6 +118,11 @@ namespace Core.Networking.Fusion
 
         private void ClearSavedSessionName()
         {
+            if (!_persistAcrossLaunches)
+            {
+                return;
+            }
+
             PlayerPrefs.DeleteKey(SavedSessionNameKey);
             PlayerPrefs.DeleteKey(SavedSessionTimeKey);
             PlayerPrefs.DeleteKey(SavedSessionRegionKey);

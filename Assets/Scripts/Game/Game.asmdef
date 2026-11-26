@@ -4,7 +4,6 @@
     "references": [
         "Core",
         "UniTask",
-        "Core.Resources",
         "Core.Input",
         "Core.UI",
         "Core.Networking.Core",
@@ -12,6 +11,7 @@
         "Core.Networking.Players",
         "Fusion.Unity",
         "Unity.InputSystem",
+        "Unity.TextMeshPro",
         "UnityEngine.UI"
     ],
     "includePlatforms": [],

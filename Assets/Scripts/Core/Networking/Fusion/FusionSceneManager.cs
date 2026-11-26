@@ -82,7 +82,9 @@ namespace Core.Networking.Fusion
             _ownedScenes.Clear();
         }
 
-        public IBroadcaster Broadcaster { get; } = new Broadcaster();
+        private IBroadcaster _broadcaster = new Broadcaster();
+
+        internal void SetBroadcaster(IBroadcaster broadcaster) => _broadcaster = broadcaster;
 
         public bool TryGetRegistration(SceneRef sceneRef, out SceneRegistration registration)
         {
@@ -105,7 +107,7 @@ namespace Core.Networking.Fusion
                 if (ShouldPublishSceneFailure(runner, completed))
                 {
                     var sceneLoadFailure = new SceneLoadFailure(runner, sceneRef, completed.Error);
-                    Broadcaster.Broadcast(sceneLoadFailure);
+                    _broadcaster.Broadcast(sceneLoadFailure);
                 }
             });
             return operation;
@@ -138,7 +140,7 @@ namespace Core.Networking.Fusion
             var loadIdText = sceneParams.LoadId.ToString();
             var record = new SceneRegistration(runner, sceneRef, actualScene, loadIdText);
             _registrations[sceneRef] = record;
-            Broadcaster.Broadcast(record);
+            _broadcaster.Broadcast(record);
         }
 
         public override NetworkSceneAsyncOp UnloadScene(SceneRef sceneRef)
@@ -156,7 +158,7 @@ namespace Core.Networking.Fusion
         protected override void OnLoadSceneProgress(SceneRef sceneRef, float progress)
         {
             var sceneProgress = new SceneProgress(Runner, sceneRef, progress);
-            Broadcaster.Broadcast(sceneProgress);
+            _broadcaster.Broadcast(sceneProgress);
             base.OnLoadSceneProgress(sceneRef, progress);
         }
 

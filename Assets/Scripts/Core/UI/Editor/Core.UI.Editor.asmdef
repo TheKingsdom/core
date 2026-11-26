@@ -5,8 +5,7 @@
         "Core.UI",
         "UnityEngine.UI",
         "Unity.TextMeshPro",
-        "Unity.InputSystem",
-        "Core.Lifetime"
+        "Unity.InputSystem"
     ],
     "includePlatforms": [
         "Editor"

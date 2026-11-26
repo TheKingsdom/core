@@ -6,7 +6,7 @@ Responsibility: [Coop sessions](../coop-sessions.md).
 
 ## Purpose
 
-`PlayerService` owns the avatar registry for one runner generation. `PlayerSessionDirector` replicates spawn admission and binds disconnected avatars. The Shared master owns the director and avatars. Master ownership transfers when that peer leaves. `PlayerSessionCoordinator` awaits scene registration, spawn, and local readiness. A callback initializes the local presentation and returns its resource lease. This assembly has no dependency on Input or UI.
+`PlayerService` owns the avatar registry for one runner generation. `PlayerSessionDirector` replicates spawn admission and binds disconnected avatars. The Shared master owns the director and avatars. Master ownership transfers when that peer leaves. `PlayerSessionCoordinator` awaits scene registration, spawn, and local readiness. The session module supplies local player setup and release callbacks. This assembly has no dependency on Input or UI.
 
 ## Player state
 
@@ -30,11 +30,10 @@ The coordinator waits for scene registration before it requests a body.
 The preparation deadline is 45 seconds. The spawn coordinator has a 30-second deadline.
 
 The application callback receives the avatar and a cancellation token.
-The bootstrap owns the callback's returned lease before it checks cancellation again.
-It then requests readiness, waits for replicated `IsReady`, and publishes `LocalPlayer`.
+The bootstrap calls the release callback once on failure, cancellation, or session exit. It runs the release callback after a pending setup callback ends.
+It then requests readiness, waits for replicated `IsReady`, and sets `LocalPlayer`.
 The network service publishes `InRoom` only after this sequence completes.
 
-Release partial resources inside a callback that throws before it returns its lease.
 Do not hide required initialization in an unobserved task. The loading window depends on this callback's completion.
 The session module binds input. A local initialization callback can supply other player resources.
 

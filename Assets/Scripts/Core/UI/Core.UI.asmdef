@@ -5,7 +5,6 @@
         "Core.Input",
         "UniTask",
         "Core",
-        "Core.Resources",
         "Unity.InputSystem",
         "Unity.TextMeshPro",
         "UnityEngine.UI",

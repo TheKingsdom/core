@@ -1,7 +1,6 @@
 using System;
 using Core.Input;
 using Core.Input.TextInput;
-using Core.UI.Windows;
 using TMPro;
 using UnityEngine;
 using UnityEngine.EventSystems;
@@ -13,6 +12,7 @@ namespace Core.UI
         [SerializeField] private string _textInputTitle = "Text";
         private TextInputService _service;
         private LocalInputService _input;
+        private GameObject _windowRoot;
         private IDisposable _session;
         private CanvasGroup _group;
         private bool _wasInteractable;
@@ -21,10 +21,11 @@ namespace Core.UI
         private bool _restoringFocus;
         private int _restoredFrame = -1;
 
-        public void Configure(TextInputService service, LocalInputService input)
+        public void Configure(TextInputService service, LocalInputService input, GameObject windowRoot = null)
         {
             _service = service;
             _input = input;
+            _windowRoot = windowRoot;
         }
 
         public override void OnSelect(BaseEventData eventData)
@@ -97,13 +98,12 @@ namespace Core.UI
         private void SuspendInteraction()
         {
             _editing = true;
-            var window = GetComponentInParent<WindowBase>();
-            var root = window ? window.gameObject : gameObject;
+            var root = _windowRoot ? _windowRoot : gameObject;
             _group = root.GetComponent<CanvasGroup>();
             if (!_group) _group = root.AddComponent<CanvasGroup>();
             _wasInteractable = _group.interactable;
             _group.interactable = false;
-            if (window)
+            if (_windowRoot)
             {
                 _shield = new GameObject("TextInputShield", typeof(RectTransform), typeof(UnityEngine.UI.Image));
                 var rect = (RectTransform)_shield.transform;

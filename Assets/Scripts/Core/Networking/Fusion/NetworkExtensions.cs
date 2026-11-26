@@ -1,4 +1,3 @@
-using Core.Resources;
 using Fusion;
 
 namespace Core.Networking.Fusion

@@ -1,8 +1,8 @@
 using System;
 using System.Threading;
 using Core.Networking.Core;
+using Core.Infra.Messaging;
 using Core.Networking.Fusion;
-using Core.Resources;
 using Cysharp.Threading.Tasks;
 using Fusion;
 using UnityEngine;
@@ -12,51 +12,42 @@ namespace Core.Networking.Players
     public sealed class PlayerSessionCoordinator : IRunnerScopeInstaller
     {
         private readonly NetworkService _network;
-        private readonly LocalPlayerIdentity _identity;
         private readonly SceneRef _scene;
-        private readonly Func<PlayerAvatar, CancellationToken, UniTask<IDisposable>> _initialize;
+        private readonly Func<PlayerAvatar, CancellationToken, UniTask> _initialize;
+        private readonly Action<PlayerAvatar> _release;
+        private readonly IBroadcaster _broadcaster;
         private readonly TimeSpan _readyTimeout;
         public PlayerSessionContext Current { get; private set; }
 
-        public PlayerSessionCoordinator(NetworkService network, LocalPlayerIdentity identity, SceneRef scene,
-            Func<PlayerAvatar, CancellationToken, UniTask<IDisposable>> initialize, TimeSpan? readyTimeout = null)
+        public PlayerSessionCoordinator(NetworkService network, SceneRef scene,
+            Func<PlayerAvatar, CancellationToken, UniTask> initialize = null, Action<PlayerAvatar> release = null,
+            TimeSpan? readyTimeout = null, IBroadcaster broadcaster = null)
         {
             _network = network;
-            _identity = identity;
             _scene = scene;
             _initialize = initialize;
+            _release = release;
+            _broadcaster = broadcaster;
             _readyTimeout = readyTimeout ?? TimeSpan.FromSeconds(45);
         }
 
-        public IDisposable Install(NetworkRunner runner, RunnerGeneration generation)
+        public void Install(NetworkRunner runner, RunnerGeneration generation)
         {
-            var resources = new ResourceScope();
-            try
+            var context = runner.gameObject.AddComponent<PlayerSessionContext>();
+            Current = context;
+            context.Configure(new PlayerService(runner, generation, _network, _broadcaster), generation);
+        }
+
+        public void Release(NetworkRunner runner, RunnerGeneration generation)
+        {
+            var context = Current;
+            if (ReferenceEquals(context, null) || context.Generation != generation)
             {
-                var context = runner.gameObject.AddComponent<PlayerSessionContext>();
-                resources.Own(new ActionLease(() =>
-                {
-                    if (ReferenceEquals(Current, context))
-                    {
-                        Current = null;
-                    }
-                    if (context)
-                    {
-                        UnityEngine.Object.Destroy(context);
-                    }
-                }));
-                var players = resources.Own(new PlayerService(runner, generation, _network));
-                context.Configure(players, generation);
-                resources.Own(context.Bootstrap);
-                resources.Own(context.Spawning);
-                Current = context;
-                return resources;
+                return;
             }
-            catch
-            {
-                resources.Dispose();
-                throw;
-            }
+
+            Current = null;
+            context.Release();
         }
 
         public async UniTask PrepareRoomAsync(NetworkRunner runner, RunnerGeneration generation,
@@ -69,14 +60,21 @@ namespace Core.Networking.Players
             {
                 await _network.SceneLoader.EnsureSceneRegisteredAsync(generation, _scene, timeout.Token);
                 await UniTask.WaitUntil(() => context && context.Director, cancellationToken: timeout.Token);
-                var result = await context.Spawning.EnsureSpawnAsync(context.Director, runner.LocalPlayer, _identity.Id, timeout.Token);
+                var result = await context.Spawning.EnsureSpawnAsync(context.Director, runner.LocalPlayer,
+                    _network.LocalPlayerId, timeout.Token);
+                timeout.Token.ThrowIfCancellationRequested();
+                if (result.Failure == SpawnFailure.Timeout)
+                {
+                    throw new TimeoutException("Avatar spawn deadline exceeded");
+                }
+
                 if (!result.IsSuccess)
                 {
                     throw new InvalidOperationException($"Avatar spawn failed: {result.Failure}");
                 }
                 await UniTask.WaitUntil(() => context.Players.TryGet(runner.LocalPlayer, out _), cancellationToken: timeout.Token);
                 context.Players.TryGet(runner.LocalPlayer, out var avatar);
-                await context.Bootstrap.EnsureReadyAsync(avatar, _initialize, timeout.Token);
+                await context.Bootstrap.EnsureReadyAsync(avatar, _initialize, _release, timeout.Token);
             }
             catch (OperationCanceledException error) when (timeout.IsCancellationRequested &&
                 !cancellationToken.IsCancellationRequested)

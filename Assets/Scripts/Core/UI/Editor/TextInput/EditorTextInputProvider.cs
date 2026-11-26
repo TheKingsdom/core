@@ -1,6 +1,5 @@
 using System;
 using Core.Input.TextInput;
-using Core.UI.Windows;
 using UnityEditor;
 using UnityEngine;
 
@@ -23,7 +22,7 @@ namespace Core.UI.Editor.TextInput
     {
         static EditorTextInputInstaller()
         {
-            WindowsService.EditorTextInputProviderFactory = () => new EditorTextInputProvider();
+            TextInputService.EditorProviderFactory = () => new EditorTextInputProvider();
         }
     }
 }

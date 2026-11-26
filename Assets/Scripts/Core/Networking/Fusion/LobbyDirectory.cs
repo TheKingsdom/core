@@ -17,11 +17,16 @@ namespace Core.Networking.Fusion
         public const string ConfirmedPlayersPropertyKey = "confirmedPlayers";
         private RegionInfo[] _regions = Array.Empty<RegionInfo>();
 
-        public IBroadcaster Broadcaster { get; } = new Broadcaster();
+        private readonly IBroadcaster _broadcaster;
         public ReadOnlyCollection<SessionData> Sessions { get; private set; } =
             Array.AsReadOnly(Array.Empty<SessionData>());
         public RunnerGeneration Generation { get; private set; }
         public string Region { get; private set; }
+
+        public LobbyDirectory(IBroadcaster broadcaster = null)
+        {
+            _broadcaster = broadcaster ?? new Broadcaster();
+        }
 
         internal void Reset(RunnerGeneration generation)
         {
@@ -29,7 +34,7 @@ namespace Core.Networking.Fusion
             Region = null;
             var array = Array.Empty<SessionData>();
             Sessions = Array.AsReadOnly(array);
-            Broadcaster.Broadcast(new LobbySessionsChanged(Sessions));
+            _broadcaster.Broadcast(new LobbySessionsChanged(Sessions));
         }
 
         internal void Update(RunnerGeneration generation, string region, IEnumerable<SessionInfo> sessions)
@@ -51,7 +56,7 @@ namespace Core.Networking.Fusion
                 return new SessionData(name, playerCount, maxPlayers, region, session.IsOpen, session.IsVisible);
             }).ToArray();
             Sessions = Array.AsReadOnly(array);
-            Broadcaster.Broadcast(new LobbySessionsChanged(Sessions));
+            _broadcaster.Broadcast(new LobbySessionsChanged(Sessions));
         }
 
         internal async UniTask FetchRegionsAsync(CancellationToken token)
